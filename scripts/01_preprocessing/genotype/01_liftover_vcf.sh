@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # liftover the VCFs from hg17 to hg19
 # using GATK liftoverVCF
@@ -8,51 +8,57 @@
 module load gatk/4.0.10.0
 module load bcftools
 
-
-# we'll store temporary files during the run
-SAVETMP="../../output/05_qtl_analysis/01_liftover_vcf/tmp_files"
-
-# storing temporary files for the run
-CONCATFILE="${SAVETMP}/tmp_concat_chroms.vcf"
-TMPFILE="${SAVETMP}/tmp.vcf"
-NORM_TMPFILE="${SAVETMP}/tmp_norm.vcf"
-
-# concatenate all of the chromosomes first
-echo "Concatenating files"
-bcftools concat /home/eulalio/deconvolution/rosmap/data/rosmap_wgs_harmonization_variant_calling/NIA_JG_1898_samples_GRM_WGS_b37_JointAnalysis01_2017-12-08_{1..22}.recalibrated_variants.vcf.gz \
-    --output ${CONCATFILE}
+#CHROM=$1
+#CHROM=22
 
 
-# select which functions to perform
-STORE_DATA=false
-NORMALIZE=false
-LIFTOVER=false
+#for CHROM in {22..8}
+#do
+    SAVETMP="../../output/05_qtl_analysis/01_liftover_vcf/tmp_files"
+    #SAVETMP=${TMPDIR}
 
-# move to tmp folder and unzip
-# adds a header line to accounts for "chr" before chromosomes in the fasta file
-# adds "chr" before the chromosome in the wgs vcf
-if [ "$STORE_DATA" = true ]
-then
-    echo "Storing temp VCF"
-    cat \
-        <(cat "$CONCATFILE" | grep "^##" ) \
-        <(cat "/home/eulalio/deconvolution/data/reference/vcf_header_chr_lines.txt") \
-        <(cat "$CONCATFILE" | grep -v "^##" | sed -r 's/^([0-9]+)/chr\1/') \
-        > ${TMPFILE}
-fi
+    # storing temporary files for the run
+    CONCATFILE="${SAVETMP}/tmp_concat_chroms.vcf"
+    TMPFILE="${SAVETMP}/tmp.vcf"
+    NORM_TMPFILE="${SAVETMP}/tmp_norm.vcf"
+    #FORM_TMPFILE="${SAVETMP}/tmp_formatted.vcf"
 
-# normalize the variant file first
-# can help to get more matches during liftOver
-if [ "$NORMALIZE" = true ]
-then
-    echo "Normalizing vcf"
-    bcftools norm \
-        --fasta-ref="/reference/RefGenomes/GATK_Resource_Bundle/hg19/hg19.fa" \
-        --check-ref s \
-        --multiallelics + \
-        --output="$NORM_TMPFILE" \
-        "${TMPFILE}" 
-fi
+    # concatenate all of the chromosomes first
+    #echo "Concatenating files"
+    #bcftools concat /home/eulalio/deconvolution/rosmap/data/rosmap_wgs_harmonization_variant_calling/NIA_JG_1898_samples_GRM_WGS_b37_JointAnalysis01_2017-12-08_{1..22}.recalibrated_variants.vcf.gz \
+        #--output ${CONCATFILE}
+
+
+    # select which functions to perform
+    STORE_DATA=false
+    NORMALIZE=false
+    LIFTOVER=false
+
+    # move to tmp folder and unzip
+    # adds a header line to accounts for "chr" before chromosomes in the fasta file
+    # adds "chr" before the chromosome in the wgs vcf
+    if [ "$STORE_DATA" = true ]
+    then
+        echo "Storing temp VCF"
+        cat \
+            <(cat "$CONCATFILE" | grep "^##" ) \
+            <(cat "/home/eulalio/deconvolution/data/reference/vcf_header_chr_lines.txt") \
+            <(cat "$CONCATFILE" | grep -v "^##" | sed -r 's/^([0-9]+)/chr\1/') \
+            > ${TMPFILE}
+    fi
+
+    # normalize the variant file first
+    # can help to get more matches during liftOver
+    if [ "$NORMALIZE" = true ]
+    then
+        echo "Normalizing vcf"
+        bcftools norm \
+            --fasta-ref="/reference/RefGenomes/GATK_Resource_Bundle/hg19/hg19.fa" \
+            --check-ref s \
+            --multiallelics + \
+            --output="$NORM_TMPFILE" \
+            "${TMPFILE}" 
+    fi
 
     # perform liftover
     # liftover from hg19 to hg38
