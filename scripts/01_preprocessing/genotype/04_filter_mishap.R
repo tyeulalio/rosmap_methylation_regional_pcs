@@ -1,7 +1,17 @@
+# --------------------------------------------------------------------------------------
+# Description: This script performs several pre-processing tasks for the ROSMAP QTL 
+#              analysis. Specifically, it:
+#              - Processes missing haplotype test results
+#              - Identifies significant variants based on an xQTL study threshold
+#              - Prepares a fileset for merging and refiltered names for data alignment
+#              - Matches and filters samples to align with methylation data
+# Dependencies: Requires the 'data.table' and 'tidyverse' libraries.
+# Input: Various data files related to ROSMAP QTL analysis.
+# Output: Processed datasets saved in the specified output directory.
+# --------------------------------------------------------------------------------------
+
 library(data.table)
 library(tidyverse)
-
-# identify variants to exclude based on missing haplotype test results
 
 
 # Initial setup
