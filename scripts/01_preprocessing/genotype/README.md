@@ -3,9 +3,7 @@
 ## Table of Contents
 
 - [VCF LiftOver Pipeline](#vcf-liftover-pipeline)
-- [Usage](#usage)
-- [Workflow](#workflow)
-- [Parameters](#parameters)
+- [PLINK2 VCF Processing Script Instructions](#plink2-vcf-processing-script-instructions)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -65,6 +63,58 @@ Inside the script, specific parameters are set at the beginning. These include p
 - The main code for this pipeline is found in `01_liftover_vcf.sh`.
 - For reference sequences, the pipeline utilizes `/reference/RefGenomes/GATK_Resource_Bundle/hg38/hg38.fa`.
 - If you encounter memory issues, rerunning the script is usually a quick solution, though it's not guaranteed to always work.
+
+
+## PLINK2 VCF Processing Script Instructions
+
+This script provides utilities for converting VCF files into PLINK formats (both PGEN and BED) and extracting a specific sample from a VCF using PLINK2.
+
+### Prerequisites:
+1. **PLINK2**: Ensure you have PLINK2 installed. If you're using a system with module environments (like many HPC clusters), the script assumes you have a `plink2` module available.
+
+2. **VCF File**: Have your VCF file ready. This script is designed for VCF files that have been normalized and can handle multiple chromosomes.
+
+### Step-by-step Instructions:
+
+1. **Clone the Repository & Navigate to the Script**:
+    \```
+    git clone <repository_url>
+    cd <repository_directory>
+    \```
+
+2. **Script Parameters**: Open the script using your preferred text editor (e.g., `nano`, `vim`, `gedit`).
+   
+    \```
+    nano plink2_processing.sh
+    \```
+
+    Adjust the following parameters at the top of the script:
+
+    - `INPUT_VCF_PATH`: Replace `../path_to_your_data/input_vcf_file.vcf` with the path to your input VCF file.
+
+    - `OUTPUT_PREFIX`: Replace `../path_to_output_dir/output_prefix` with the desired output directory path and prefix for your output files.
+
+    - `SAMPLES_KEEP_PATH`: Replace `../path_to_samples_dir/samples_to_keep.tsv` with the path to your samples file. This file should list the samples you wish to keep, one per line.
+
+    - `ONE_SAMPLE_PATH`: Replace `../path_to_samples_dir/one_sample.tsv` with the path to a file containing a single sample name you wish to extract from the VCF.
+
+    - Filters (`MIND_FILTER`, `HWE_FILTER`, `GENO_FILTER`, `MAF_FILTER`): Adjust these values as needed. They correspond to PLINK's `--mind`, `--hwe`, `--geno`, and `--maf` flags, respectively.
+
+3. **Run the Script**: Once you've made the necessary changes, save and close the script. Now, you can run it:
+
+    \```
+    bash plink2_processing.sh
+    \```
+
+    The script will produce:
+
+    - PGEN formatted files for the entire VCF: `*_pgen.pgen`, `*_pgen.pvar`, `*_pgen.psam`
+    - BED formatted files for the entire VCF: `*_bed.bed`, `*_bed.bim`, `*_bed.fam`
+    - A VCF file for the single sample specified: `*_one_sample_vcf.vcf`
+
+4. **Check Output**: Once the script completes, navigate to the output directory you specified in the `OUTPUT_PREFIX` variable. Here, you will find all your generated files.
+
+
 
 ## Contributing
 
