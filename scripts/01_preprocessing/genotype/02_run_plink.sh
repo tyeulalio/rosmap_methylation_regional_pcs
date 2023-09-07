@@ -1,55 +1,82 @@
 #!/bin/bash
 
-# using plink2 on scg
+# Description:
+# This script uses plink2 to process VCF files for the rosmap project.
+# The script performs three main operations:
+# 1. Conversion of VCF to PLINK's PGEN format
+# 2. Conversion of VCF to PLINK's BED format
+# 3. Extraction of a sample from the VCF
+
+# Usage:
+# ./script_name.sh
+
+# Prerequisites:
+# - Ensure plink2 is installed and accessible through the module system or globally.
+# - Specify the input paths, output paths, and filter values accordingly.
+
+# -----------------
+# PARAMETERS
+# -----------------
+
+# Paths
+INPUT_VCF_PATH="../path_to_your_data/input_vcf_file.vcf"
+OUTPUT_PREFIX="../path_to_output_dir/output_prefix"
+SAMPLES_KEEP_PATH="../path_to_samples_dir/samples_to_keep.tsv"
+ONE_SAMPLE_PATH="../path_to_samples_dir/one_sample.tsv"
+
+# Plink2 Filters (adjust as needed)
+MIND_FILTER=0.05
+HWE_FILTER=0.001
+GENO_FILTER=0.05
+MAF_FILTER=0.01
+
+# Load plink2 module (if using environment modules system)
+echo "Loading plink2 module..."
 module load plink2
 
-# run plink to generate files for rosmap
-
-
-# make the plink2 format ped files
-echo "Creating pgen files"
+# Convert VCF to PLINK's PGEN format
+echo "Creating PGEN files..."
 plink2 \
-    --vcf "../../data/rosmap_wgs_liftover_hg38/rosmap_wgs_all_chroms_normalized.vcf" \
+    --vcf "$INPUT_VCF_PATH" \
     --make-pgen \
     --allow-extra-chr \
     --chr 1-22 \
     --output-chr chrM \
     --max-alleles 2 \
-    --keep "../../output/01_preprocessing/01_subset_samples/keep_wgs_samples.tsv" \
-    --mind 0.05 \
-    --hwe 0.001 \
-    --geno 0.05 \
-    --maf 0.01 \
+    --keep "$SAMPLES_KEEP_PATH" \
+    --mind $MIND_FILTER \
+    --hwe $HWE_FILTER \
+    --geno $GENO_FILTER \
+    --maf $MAF_FILTER \
     --set-all-var-ids "@_#_\$r_\$a" \
     --new-id-max-allele-len 20 missing \
     --vcf-half-call missing \
-    --out "../../data/rosmap_wgs_harmonization_plink/rosmap_wgs_hg38_all_chroms"
+    --out "${OUTPUT_PREFIX}_pgen"
 
-
-# make the plink format bed files
-echo "Creating bed files"
+# Convert VCF to PLINK's BED format
+echo "Creating BED files..."
 plink2 \
-    --vcf "../../data/rosmap_wgs_liftover_hg38/rosmap_wgs_all_chroms_normalized.vcf" \
+    --vcf "$INPUT_VCF_PATH" \
     --make-bed \
     --allow-extra-chr \
     --chr 1-22 \
     --output-chr chrM \
     --max-alleles 2 \
-    --keep "../../output/01_preprocessing/01_subset_samples/keep_wgs_samples.tsv" \
-    --mind 0.05 \
-    --hwe 0.001 \
-    --geno 0.05 \
-    --maf 0.01 \
+    --keep "$SAMPLES_KEEP_PATH" \
+    --mind $MIND_FILTER \
+    --hwe $HWE_FILTER \
+    --geno $GENO_FILTER \
+    --maf $MAF_FILTER \
     --set-all-var-ids "@_#_\$r_\$a" \
     --new-id-max-allele-len 20 missing \
     --vcf-half-call missing \
-    --out "../../data/rosmap_wgs_harmonization_plink/rosmap_wgs_hg38_all_chroms"
+    --out "${OUTPUT_PREFIX}_bed"
 
-
-echo "Creating VCF files"
+# Extract a sample from the VCF
+echo "Creating VCF files for a single sample..."
 plink2 \
-    --vcf "../../data/rosmap_wgs_liftover_hg38/rosmap_wgs_all_chroms_normalized.vcf" \
-    --keep "../../output/01_preprocessing/01_subset_samples/one_sample.tsv" \
+    --vcf "$INPUT_VCF_PATH" \
+    --keep "$ONE_SAMPLE_PATH" \
     --export vcf \
     --allow-extra-chr \
     --chr 1-22 \
@@ -58,10 +85,7 @@ plink2 \
     --set-all-var-ids "@_#_\$r_\$a" \
     --new-id-max-allele-len 20 missing \
     --vcf-half-call missing \
-    --out "../../data/rosmap_wgs_harmonization_plink/rosmap_wgs_hg38_all_chroms"
+    --out "${OUTPUT_PREFIX}_one_sample_vcf"
 
-    
-    #--mind 0.05 \
-    #--hwe 0.001 \
-    #--geno 0.05 \
-    #--maf 0.01 \
+# End of Script
+
