@@ -91,6 +91,7 @@ load_samples <- function(){
     head(samples$path)
 
     # check the analysis type
+    # filter based on this
     filtered_samples <- samples %>%
         filter(dataSubtype == 'raw',
                fileFormat == 'idat'
@@ -117,15 +118,7 @@ load_samples <- function(){
         arrange(-n) %>%
         head()
 
-    # format the columsn properly
-    formatted_annotations <- filtered_samples %>%
-        mutate(Basename = str_remove(path, "_[a-zA-Z]{3}\\.idat")) %>%
-        select(-name, -path) %>%
-        unique()
-    head(formatted_annotations)
-
     dim(formatted_annotations)
-
 
     formatted_annotations
 }
@@ -134,23 +127,8 @@ load_samples <- function(){
 
 # -- PART 1 
 
-# qc for samples filters samples that: dont show beta distribution, with bisulfite conversion efficiency <80%, fail probe control metrics using ewastools,  are outliers in snp-heatmap (compared within each individual)
+# qc for samples filters samples that: with bisulfite conversion efficiency <80%, fail probe control metrics using ewastools,  are outliers in snp-heatmap (compared within each individual)
 qualitycontrol_samples <- function(targets, rgset){
-    
-  # make density plots and manually select the ones that dont show beta distribution (peak at 0 and 1)
-  # densityplots_bybatch(rgset) - do this with variables that may count as "batches"
-  #densityplots_plotly(rgset) # check out density plots for samples - takes a while to run
-  
-  
-    # skip this step because too many samples in ROSMAP
-  # NOTE: need to select these based on density plots 
-  # define and remove samples that did not show beta value distribution in density plots
-  #print(paste0("sample number : ", nrow(targets))) # printing numbers is just for my protocol + downstream overview.
-  #print("removing samples with bad density plots")
-  #bad_density <- c("UCI1817Lx","UCI2017N_tR_04_samerun_otherchip", "UCI617J2", targets$sample_name[targets$batch == "Batch_9"])
-  #rgset <- rgset[ , !(colnames(rgset) %in% bad_density)]
-  #targets <- targets[targets$sample_id %in% colnames(rgset), ]
-  
 
   # bisulfite conversion efficiency
   print(paste0("sample number : ", nrow(targets)))
@@ -177,27 +155,9 @@ qualitycontrol_samples <- function(targets, rgset){
   rgset_bsc
   rgset
 
-
-  #bsc <- as.data.frame(bsc)
-  #bad_bsc <- rownames(bsc)[bsc$bsc < 80] # remove samples with bc efficiency <80% = "UCI4117F"
-  #rgset <- rgset[ ,!(colnames(rgset) %in% bad_bsc)]
   targets <- targets[targets$sample_id %in% colnames(rgset_bsc), ]
   print(paste0("sample number : ", ncol(rgset_bsc)))
   
-  
-  
-  # snp heatmap
-  #snp_heatmap_bysource(rgset) # prints all heatmaps by sample source (=individual donor/patient) in one pdf
-  #print("removing samples that don't match snp heatmap pattern of samples from same donor")
-  
-  # NOTE: need to select any samples that seem bad
-  # manually removing snp outliers as seen in heatmaps from snp_heatmap_bysource
-  #bad_snp <- c("UCI617J2_redoBatch4fail", "UCI618J2", "UCI1618TERx", "UCI1818DEN", "UCI2017CA1", "UCI4118CA1_tR01")
-  #rgset <- rgset[, !(colnames(rgset) %in% bad_snp)]
-  #targets <- targets[targets$sample_id %in% colnames(rgset), ]
-  #print(paste0("sample number : ", nrow(targets)))
-  
-
   
   # use contol_metrics function from ewastools to remove failed samples
   print("use contol_metrics function from ewastools to remove failed samples")
@@ -272,130 +232,6 @@ preprocess_pipeline <- function(targets, rgset){
   # Finally remove do dye-bias-correction using noob and normalization 
   # using bmiq and remove all technical and biological replicates)
   qc_probes_norm_remove_reps(targets, rgset)
-}
-
-
-
-
-
-#quality_control <- function(rgset){
-    #rgset
-
-    ## calculate the detection p-value
-    #detp <- minfi::detectionP(rgSet=rgset)
-    #head(detp)
-
-    #colmeans <- colMeans(detp)
-    #summary(colmeans)
-
-    #rowmeans <- rowMeans(detp)
-    #summary(rowmeans)
-
-#}
-
-
-
-
-# density plot for each batch
-densityplots_bybatch <- function (rgset) {
-  require(data.table)
-  
-  pData(rgset)
-  
-  pd <- pData(rgset) %>%  
-    as.data.frame() %>%
-    select(sample_id, batch)
-  pdf("densityplots_by_batch.pdf")
-  
-  # if using this, be sure to change variable names (like sample_name -> sample_id)
-  # to match the data
-  
-  
-  for (i in unique(pd$batch)){
-    pd2 <- pd[pd$batch==paste0(i),]
-    keep <- colnames(rgset) %in% pd2$sample_name
-    rgset2 <- rgset[,keep]
-    ad <- getBeta(rgset2) %>% melt()
-    colnames(ad) <- c('ProbeID', 'sample_name', 'beta')
-    ad$sample_name <- as.character(ad$sample_name)
-    ad <- as.data.table(ad)
-    plot_data <- pd2 %>% inner_join(ad, by='sample_name')
-    print(
-      ggplot(plot_data , aes(x=beta, colour=as.factor(sample_name))) + 
-        geom_density()+
-        geom_hline(yintercept=0, colour="white", size=1)+#overrides the vertical line with white line
-        stat_density(aes(x=beta, colour=as.factor(sample_name)), geom="line", position="identity")+
-        theme(legend.position="right") +
-        labs(colour='Sample ID')+
-        ggtitle("density plot batch : ",i)+
-        xlab(label = 'beta value')
-    )
-  }
-  dev.off()
-}
-
-# interactive density plot using plotly, colored by batch
-densityplots_plotly <- function(rgset){
-  
-  # select variables here that you may want to group by
-  # in the plot below
-  pd <- pData(rgset) %>%  
-    as.data.frame() %>%
-    select(sample_id)
-  head(pd)
-
-  
-  # get the beta values and reformat data
-  ad <- getBeta(rgset) %>% 
-    as.data.frame() 
-
-    formatted_ad <- ad %>%
-        rownames_to_column('probe_id') %>% 
-        gather('sample_id', 'beta', -probe_id) %>%
-        na.omit()
-  head(formatted_ad)
-  
-  
-  # join the two tables
-  plot_data <- pd %>% 
-    inner_join(ad, by='sample_id')
-  
-  
-  # this should create the plot, may take a long time
-  pdf(paste0(savedir, "beta_density_plot.pdf"))
-  ggplot(formatted_ad, aes(x=beta, colour=sample_id)) + 
-    #geom_density(aes(group = sample_name, color = batch),position="identity")+
-    geom_density(aes(color = sample_id),position="identity")+
-    geom_hline(yintercept=0, colour="white", size=1)+#overrides the vertical line with white line
-    theme(legend.position = "none") +
-    #labs(fill = 'batch') +
-    scale_color_manual(values=col)+
-    ggtitle("density Plot") +
-    xlab(label = 'beta value')
-  dev.off()
-  
-}
-
-# snp heatmap
-snp_heatmap_bysource <- function(rgset) {
-  # select variables that you care about here - things like "batch"
-  # that you might want to separate your visualization with
-  pd <- pData(rgset) %>%  
-    as.data.frame() %>%
-    dplyr::select(sample_id)
-  pData(rgset)
-  
-  my_col <- "heat.colors"#define color palette for heatmap
-  pdf(paste0(savedir, "SNP_heatmaps_allsamples.pdf"),onefile=T, paper='A4r', width=9,height=7)
-  
-  snps <- minfi::getSnpBeta(rgset) 
-  snps <- snps[,order(colnames(snps))]
-  print(
-    heatmap.2(snps,scale = "none", trace = "none", margins = c(8,8),
-              labRow = rownames(snps), labCol = colnames(snps), col = my_col,
-              cexCol = 0.5, cexRow = 0.5, main = paste0("SNP heatmap"))
-  )
-  dev.off()
 }
 
 
@@ -477,9 +313,6 @@ filter_snps <- function(betas, targets){
                            ".recalibrated_variants.annotated.vcf.gz")
         annots <- fread(datafile, skip='#CHROM')
         head(annots)
-
-        #full_annots <- annots
-        #annots <- full_annots[1:1000,]
 
         # keep only the info with AF
         formatted_annots <- annots %>%
@@ -589,19 +422,6 @@ filter_snps <- function(betas, targets){
     savefile
     saveRDS(targets, savefile)
 
-    #sds <- apply(formatted_betas, 1, sd)
-    #summary(sds)
-    #formatted_betas <- readRDS(savefile)
-    #head(formatted_betas)
-    #unmeth <- 1 - as.matrix(formatted_betas)
-    #head(unmeth)
-    #methset <- MethylSet(Meth=as.matrix(formatted_betas), Unmeth=unmeth)
-    #head(methset)
-
-    #props <- estimateCellCounts(methset, 
-                                 #compositeCellType='DLPFC', 
-                                 #referencePlatform="IlluminaHumanMethylation450k"
-                                #)
 }
 
 
@@ -609,8 +429,6 @@ filter_snps <- function(betas, targets){
 qc_probes_norm_remove_reps <- function(targets, rgset) {
   print(paste0("starting quality control of probes"))
   print(paste0("probe number: ", nrow(rgset)))
-  
-  
 
   # use noob for dye bias Correction
   print(paste0("running noob dye bias correction"))
@@ -788,26 +606,6 @@ qc_probes_norm_remove_reps <- function(targets, rgset) {
   savefile <- paste0(savedir, "targets_bmiq.rds")
   targets <- readRDS(savefile)
 
-  # not going to do this right now
-  #print("removing probes with low variability (SD < 0.01) using rnb.execute.variability.removal")
-  #var_thresh = 0.01
-  #pheno_temp <- data.frame(Sample = colnames(betas))
-  #rnb_set <- RnBeadSet(pheno = pheno_temp, probes = rownames(betas), betas = betas, platform = "450k")
-  #thresh = rnb.getOption('filtering.deviation.threshold')
-  #rnb_set_filtered <- rnb.execute.variability.removal(rnb_set, var_thresh)$dataset
-
-  #rnb_set
-  #rnb_set_filtered
- 
-  # get betas from rnb_set
-  #betas_var <- meth(rnb_set_filtered, type = "sites" , row.names = TRUE)
-
-  #betas_var_man <- betas[apply(betas, 1, sd) >= 0.01,]
-  
-  dim(betas_var)
-  dim(betas_var_man)
-  dim(betas)
-
   betas <- betas_var
 
   # filter probes that overlap SNPs with AF >= 0.01
@@ -821,15 +619,9 @@ get_filtered_rgset <- function(){
   rgset <- readRDS(savefile)
   rgset
   
-  #savefile <- paste0(savedir, "targets_qcsfilt_hg19.rds")
-  #targets <- readRDS(savefile)
-
   thresh = 0
     savefile <- paste0(savedir, "snp", thresh, "_window0_filtered_betas.rds")
     savefile
-
-    #savefile <- paste0(savedir, "snp", thresh, "_window0_filtered_targets.rds")
-    #savefile
 
     formatted_betas <- readRDS(savefile)
     head(formatted_betas)
@@ -922,8 +714,3 @@ targets$sample_id <- colnames(rgset_raw)
 # run full analysis pipeline 
 # this includes quality control of samples, probes, normalization and removal of replicates
 preprocess_pipeline(targets_raw, rgset_raw)
-
-
-
-
-
