@@ -1,9 +1,6 @@
 #!/usr/bin/perl
 
-
-# use chrom18_only for testing
-$CHROMDIR="";
-#$CHROMDIR="chrom18_only/";
+# This script was adapted from the Eigensoft SmartPCA tool
 
 # MUST put smartpca bin directory in path for smartpca.perl to work
 $ENV{'PATH'} = "/home/eulalio/programs/EIG-7.2.1/bin:$ENV{'PATH'}"; 
@@ -11,19 +8,17 @@ $ENV{'PATH'} = "/home/eulalio/programs/EIG-7.2.1/bin:$ENV{'PATH'}";
 $ENV{'PATH'} = "/home/eulalio/programs/EIG-7.2.1/src/eigensrc:$ENV{'PATH'}"; 
 
 $EXAMPLEDIR="/home/eulalio/programs/EIG-7.2.1/EIGENSTRAT/";
-$OUT="/home/eulalio/deconvolution/new_rosmap/output/05_qtl_analysis/07_geno_pca/${CHROMDIR}eigenstrat_smartpca_hg38";
+$OUT="/home/eulalio/deconvolution/new_rosmap/output/05_qtl_analysis/07_geno_pca/eigenstrat_smartpca_hg38";
 
 
 $command = "smartpca.perl";
 # input files
-#$command .= " -i ../../output/qtl_analysis/02_plink_filtered/rosmap_wgs_chr22.bed ";
 # geno file - PACKEDPED format
-$command .= " -i ../../output/05_qtl_analysis/06_merge_bims/${CHROMDIR}all_chroms_hg38.bed ";
+$command .= " -i ../../output/05_qtl_analysis/06_merge_bims/all_chroms_hg38.bed ";
 # snp file - PACKEDPED format
-$command .= " -a ../../output/05_qtl_analysis/06_merge_bims/${CHROMDIR}all_chroms_ref_counts_hg38.map ";
+$command .= " -a ../../output/05_qtl_analysis/06_merge_bims/all_chroms_ref_counts_hg38.map ";
 # indiv file
-$command .= " -b ../../output/05_qtl_analysis/06_merge_bims/${CHROMDIR}all_chroms_ref_counts_hg38.ped " ;
-#$command .= " -b ../../output/qtl_analysis/01_setup_genotypes/eigenstrat_pheno.ind " ;
+$command .= " -b ../../output/05_qtl_analysis/06_merge_bims/all_chroms_ref_counts_hg38.ped " ;
 # number of PCs to output - default = 10
 $command .= " -k 10 ";
 # output files
