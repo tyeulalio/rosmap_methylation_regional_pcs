@@ -227,10 +227,3 @@ main <- function(){
 }
 
 main()
-
-
-
-
-
-
-

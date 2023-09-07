@@ -1,63 +1,68 @@
 #!/bin/bash
 
-# using plink on scg
+# Pipeline for running PLINK and PLINK2 get necessary files for downstream steps
+# This script is designed to run on SCG
+
+# Load required modules
 module load plink
 module load plink2
 
-# run plink to generate files 
-# need to run all three parts here, some are commented out during testing
+# define common directories and files
+OUTPUT_DIR="../../output/05_qtl_analysis"
+DATA_DIR="../../data/rosmap_wgs_harmonization_plink"
 
 
+
+# Step 1: Identify multiallelic sites
 # try to merge files, this will throw an error because of multiallelic sites
 # use the output of this to remove those sites
 echo "-- Finding multiallelic sites --"
 plink \
     --make-bed \
     --biallelic-only \
-    --merge-list "../../output/05_qtl_analysis/05_filter_mishap/${CHROMDIR}bim_files_hg38.txt" \
-    --exclude "../../output/05_qtl_analysis/05_filter_mishap/${CHROMDIR}exclude_variants_hg38.txt" \
-    --keep "../../output/05_qtl_analysis/05_filter_mishap/keep_samples.txt" \
-    --out "../../output/05_qtl_analysis/06_merge_bims/${CHROMDIR}all_chroms_hg38"
+    --merge-list "${OUTPUT_DIR}/05_filter_mishap/bim_files_hg38.txt" \
+    --exclude "${OUTPUT_DIR}/05_filter_mishap/exclude_variants_hg38.txt" \
+    --keep "${OUTPUT_DIR}/05_filter_mishap/keep_samples.txt" \
+    --out "${OUTPUT_DIR}/06_merge_bims/all_chroms_hg38"
 
-# excluding multiallelic sites found
+# Step 2: Remove multiallelic sites from individual chromosome files
 for CHROM in {1..22}
 do
     echo "removing multiallelic sites for chromosome ${CHROM}"
         plink2 \
-            --pfile "../../data/rosmap_wgs_harmonization_plink/rosmap_wgs_hg38_chr${CHROM}" \
+            --pfile "${DATA_DIR}/rosmap_wgs_hg38_chr${CHROM}" \
             --make-pgen \
-            --exclude "../../output/05_qtl_analysis/06_merge_bims/all_chroms_hg38-merge.missnp" \
-            --out "../../output/05_qtl_analysis/06_merge_bims/rosmap_wgs_hg38_chr${CHROM}_refiltered"
+            --exclude "${OUTPUT_DIR}/06_merge_bims/all_chroms_hg38-merge.missnp" \
+            --out "${OUTPUT_DIR}/06_merge_bims/rosmap_wgs_hg38_chr${CHROM}_refiltered"
 done
 
-# now merge the files
+# Step 3: Merge the cleaned chromosome files
+# Make both p-gen and bed files
 echo "-- Merging files --"
 plink2 \
     --make-pgen \
-    --pfile "../../data/rosmap_wgs_harmonization_plink/rosmap_wgs_hg38_all_chroms" \
-    --exclude "../../output/05_qtl_analysis/05_filter_mishap/${CHROMDIR}exclude_variants_hg38.txt" \
-    --keep "../../output/05_qtl_analysis/05_filter_mishap/keep_samples.txt" \
-    --out "../../output/05_qtl_analysis/06_merge_bims/${CHROMDIR}all_chroms_hg38"
+    --pfile "${DATA_DIR}/rosmap_wgs_hg38_all_chroms" \
+    --exclude "${OUTPUT_DIR}/05_filter_mishap/exclude_variants_hg38.txt" \
+    --keep "${OUTPUT_DIR}/05_filter_mishap/keep_samples.txt" \
+    --out "${OUTPUT_DIR}/06_merge_bims/all_chroms_hg38"
 
 plink2 \
     --make-bed \
-    --pfile "../../data/rosmap_wgs_harmonization_plink/rosmap_wgs_hg38_all_chroms" \
-    --exclude "../../output/05_qtl_analysis/05_filter_mishap/${CHROMDIR}exclude_variants_hg38.txt" \
-    --keep "../../output/05_qtl_analysis/05_filter_mishap/keep_samples.txt" \
-    --out "../../output/05_qtl_analysis/06_merge_bims/${CHROMDIR}all_chroms_hg38"
-    #--pmerge-list "../../output/05_qtl_analysis/05_filter_mishap/${CHROMDIR}bim_files_hg38_refiltered.txt" \
+    --pfile "${DATA_DIR}/rosmap_wgs_hg38_all_chroms" \
+    --exclude "${OUTPUT_DIR}/05_filter_mishap/exclude_variants_hg38.txt" \
+    --keep "${OUTPUT_DIR}/05_filter_mishap/keep_samples.txt" \
+    --out "${OUTPUT_DIR}/06_merge_bims/all_chroms_hg38"
 
-# create counts of reference allele
+# Step 4: Create counts of reference alleles
 echo "-- Creating counts file"
 plink2 \
-    --pfile "../../output/05_qtl_analysis/06_merge_bims/${CHROMDIR}all_chroms_hg38" \
-    --out "../../output/05_qtl_analysis/06_merge_bims/${CHROMDIR}all_chroms_ref_counts_hg38" \
+    --pfile "${OUTPUT_DIR}/06_merge_bims/${CHROMDIR}all_chroms_hg38" \
+    --out "${OUTPUT_DIR}/06_merge_bims/${CHROMDIR}all_chroms_ref_counts_hg38" \
     --export A-transpose
     
-
-#create ped file
+# Step 5: Create a PED file for the merged dataset
 echo "-- Creating ped file"
 plink2 \
-    --pfile "../../output/05_qtl_analysis/06_merge_bims/${CHROMDIR}all_chroms_hg38" \
-    --out "../../output/05_qtl_analysis/06_merge_bims/${CHROMDIR}all_chroms_ref_counts_hg38" \
+    --pfile "${OUTPUT_DIR}/06_merge_bims/${CHROMDIR}all_chroms_hg38" \
+    --out "${OUTPUT_DIR}/06_merge_bims/${CHROMDIR}all_chroms_ref_counts_hg38" \
     --export ped
