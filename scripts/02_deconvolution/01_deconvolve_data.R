@@ -1,94 +1,22 @@
-#library(isva) # required for smartSVA
 library(wateRmelon)
 library(EpiSCORE)
 library(TCA)
 library(RNOmni)
 library(RColorBrewer)
 library(ggplot2)
-#library(limma)
 library(tidyverse)
 
-source("/home/eulalio/deconvolution/new_rosmap/scripts/shared_functions/02_plot_colors.R")
-
-#library(RhpcBLASctl)
-#blas_set_num_threads(16) #limit number of threads for openblas to 16
-
-#library(parallel)
-
+# Use EpiSCORE to estimate cell type proportions for ROSMAP methylation data
+# Use Tensor Composition Analysis to deconvolve ROSMAP methylation data
 # Run this on betas from the normalized and QC'ed beta values
 
-sub_chroms = FALSE
-keep_chroms = paste0("chr", 22)
-
-c1_covariates = FALSE
-c2_covariates = TRUE
-reestimate_props = TRUE
-
-main_savedir <- paste0("../../output/02_deconvolution/01_deconvolved_data/")
-main_savedir
-dir.create(main_savedir, showWarnings=FALSE)
-
-
-if (reestimate_props){
-    main_savedir <- paste0(main_savedir, "restimate_proportions/")
-    dir.create(main_savedir, showWarnings=FALSE)
-}
-
-
-if (sub_chroms){
-    chr_savedir <- paste0(main_savedir, "sub_chroms/")
-    chr_savedir
-    dir.create(chr_savedir)
-} else{
-    chr_savedir <- main_savedir
-}
-
-if (c2_covariates & !c1_covariates){
-    savedir <- paste0(chr_savedir, "c2_covariates/")
-    savedir
-    dir.create(savedir)
-}
-
-if (c2_covariates & c1_covariates){
-    savedir <- paste0(chr_savedir, "c1_c2_covariates/")
-    savedir
-    dir.create(savedir)
-}
-
-if (!c1_covariates & !c2_covariates){
-    savedir <- paste0(chr_savedir, "no_covariates/")
-    savedir
-    dir.create(savedir)
-}
-
-if (c1_covariates & !c2_covariates){
-    savedir <- paste0(chr_savedir, "c1_covariates/")
-    savedir
-    dir.create(savedir)
-}
-
-savedir
-
-#precleaned_str = "precleaned_"
-precleaned_str = ""
-
-include_study = TRUE
-if (include_study){
-    savedir = paste0(savedir, "include_study/")
-    dir.create(savedir)
-}
-
-
+savedir <- "/path/to/savedir"
 
 load_methylation <- function(thresh){
+    # thresh = allele frequency threshold used in preprocessing
 
-    if (precleaned_str == "precleaned_"){
-        print("Loading precleaned data")
-        # use the cleaned methylation data
-        datafile <- paste0("../../output/01_preprocessing/02_svd_batch_correction/cleaned_betas.rds")
-    } else{
-        datafile <- paste0("../../output/01_preprocessing/methylation/01_preprocessing_methylation/snp", thresh, "_window0_filtered_betas.rds")
-    }
+    # preprocessed ROSMAP methylation data
+    datafile <- paste0("../../output/01_preprocessing/methylation/01_preprocessing_methylation/snp", thresh, "_window0_filtered_betas.rds")
 
     betas <- readRDS(datafile)
     head(betas)
@@ -99,26 +27,9 @@ load_methylation <- function(thresh){
 
 load_clinical <- function(){
     # load phenotype data
-    #datafile <- paste0("../../output/01_preprocessing/methylation/01_preprocessing_methylation/snp0.01_window10_filtered_targets.rds")
     datafile <- paste0("../../output/01_preprocessing/01_subset_samples/matched_clincal_meta.rds")
     targets <- readRDS(datafile)
     head(targets)
-
-
-    #datafile <- paste0("../../output/06_svd_batch_correction/formatted_clinical.rds")
-    #datafile <- paste0("../../output/01_preprocessing/")
-    #datafile <- paste0("../../output/05_check_covariates/clinical_metadata.rds") 
-    #clinical <- readRDS(datafile)
-    #head(clinical)
-
-    #return(targets)
-
-    # grab map between specimenID and individualID
-    #datafile <- paste0("../../output/02_connect_samples/exp_meth_overlapped_meta.rds")
-    #meta <- readRDS(datafile)
-    #names(meta)
-    #meth_meta <- meta$meth_meta
-    #head(meth_meta)
 
     # grab mapping from meth colname and specimenID
     datafile <- paste0("../../data/ROSMAP_data/Epigenetics/Epigenetics (DNA methylation array)/SYNAPSE_METADATA_MANIFEST.tsv")
@@ -135,7 +46,6 @@ load_clinical <- function(){
     head(name_map)
 
     # map specimen to individualID
-    #head(meth_meta)
     specimen_map <- targets %>%
         select(individualID, specimenID=meth.specimenID) %>%
         inner_join(name_map) %>%
@@ -146,21 +56,6 @@ load_clinical <- function(){
     mapped_clinical <- targets %>%
         left_join(specimen_map)
     head(mapped_clinical)
-
-
-    # connect batch info to metadata
-    #datafile <- paste0("../../data/ROSMAP_data/Metadata/ROSMAP_assay_methylationArray_metadata.csv")
-    #meta <- read_csv(datafile)
-    #head(meta)
-
-    #table(mapped_clinical$Sample_Plate, useNA='ifany')
-
-    #sub_meta <- meta %>%
-        #select(specimenID, platform, Sentrix_ID, Sentrix_Row_Column, Sample_Plate, Sample_Well, batch)
-
-    #mapped_clinical <- mapped_clinical %>%
-        #left_join(sub_meta)
-    #head(mapped_clinical)
 
     savefile <- paste0(savedir, "mapped_clinical.rds")
     savefile
@@ -949,6 +844,7 @@ plot_proportions <- function(thresh, formatted_clinical){
 }
 
 main <- function(){
+    # run through the main workflow
 
     print("Loading data")
 
