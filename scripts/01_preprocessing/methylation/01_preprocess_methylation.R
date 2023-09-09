@@ -18,36 +18,13 @@ library(doParallel)
 registerDoParallel(cores = 16) #This must be called or multithreading will not work
 
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
-#library(impute)
 library(minfi)
-#library(limma)
-#library(RColorBrewer)
-#library(missMethyl)
-#library(Gviz)
-#library(DMRcate)
-#library(stringr)
-#library(grid)
 library(wateRmelon)
-#library(methylumi)
 library(ChAMP)
-#library(MethylAid)
-#library(DNAmArray)
-#library(gemPlot)
-#library(gplots)
 library(ewastools)
-#library(reshape)
-#library(data.table)
 library(maxprobes)
-#library(randomcoloR)
-#library(plotly)
-#library(ggplot2)
-#library(dplyr)
-#library(viridis)
-#library(circlize)
-#library(gnn)
 library(RnBeads.hg19)
 library(RnBeads) # BiocManager::install('RnBeads.hg38') # make sure this is installed for RnBeads
-#library(lumi)
 library(data.table)
 library(tidyverse)
 
@@ -72,46 +49,51 @@ dir.create(savedir)
 
 # ---- functions -----
 load_samples <- function(){
-    # load the data files and combine some phenotypes together
-    # save the combined df and return the df
+    # Function to load sample, filter, and format annotations
+    # Example usage:
+    # result <- load_samples("path/to/data/directory/")
 
     # NOTE: you might want to check all data files to see
     # if there are any other important features that we might
     # want to carry forward in the analyses
 
 
+    # Load the metadata tsv file
     # adjust the sample annotations provided
-    # need a Barcode column
     sample_annotations <- paste0(datadir, "SYNAPSE_METADATA_MANIFEST.tsv")
     samples <- read_tsv(sample_annotations) %>%
         as.data.frame()
     head(samples)
 
+    # check out where these files come from 
     table(samples$analysisType)
+    table(filtered_samples$fileFormat)
     head(samples$path)
 
-    # check the analysis type
-    # filter based on this
+    # filter samples for raw data and idat format
     filtered_samples <- samples %>%
         filter(dataSubtype == 'raw',
                fileFormat == 'idat'
         )
     head(filtered_samples)
-
     table(filtered_samples$fileFormat)
 
     dim(samples)
     dim(filtered_samples)
     head(filtered_samples)
 
-    # get the base filename
+    # Format annotations: remove path and name, keep unique rows
     formatted_annotations <- filtered_samples %>%
         mutate(Basename = str_remove(name, "_[a-zA-Z]{3}\\.idat")) %>%
         select(-path, -name) %>%
         unique()
     head(formatted_annotations)
-    length(unique(formatted_annotations$Basename))
-    length(unique(formatted_annotations$specimenID))
+
+    # make sure we have the same number of filenames and specimenIDs
+    # Optional: Display counts of unique Basenames and specimenIDs
+    cat("Count of unique Basenames:", length(unique(formatted_annotations$Basename)), "\n")
+    cat("Count of unique specimenIDs:", length(unique(formatted_annotations$specimenID)), "\n")
+
     formatted_annotations %>%
         select(specimenID, Basename) %>%
         count(specimenID) %>%
@@ -120,165 +102,157 @@ load_samples <- function(){
 
     dim(formatted_annotations)
 
-    formatted_annotations
+    # return the formatted annotaions
+    return(formatted_annotations)
 }
 
 
 
 # -- PART 1 
 
-# qc for samples filters samples that: with bisulfite conversion efficiency <80%, fail probe control metrics using ewastools,  are outliers in snp-heatmap (compared within each individual)
 qualitycontrol_samples <- function(targets, rgset){
+    # Function to perform quality control on samples
+    # qc for samples filters samples that: with bisulfite conversion efficiency <80%, 
+    # fail probe control metrics using ewastools
 
-  # bisulfite conversion efficiency
-  print(paste0("sample number : ", nrow(targets)))
-  print("removing samples with bisulfite conversion efficiency < 80%")
-  # get the bisulfite conversion effeciency
-  # remove samples with < 80
-  bsc <- bscon(rgset) %>% # checks bisulfite conversion efficiency
+    # -- bisulfite conversion efficiency -- #
+    print(paste0("sample number : ", nrow(targets)))
+    print("removing samples with bisulfite conversion efficiency < 80%")
+
+    # compute bisulfite conversion effeciency
+    bsc <- bscon(rgset) %>% # checks bisulfite conversion efficiency
             as.data.frame() %>%
             rename(bsc=".")
-  head(bsc)
+    head(bsc)
 
-  # check for failed samples
-  bad_bsc <- bsc %>%
-      filter(bsc < 80)
-  head(bad_bsc)
+    # subset based on bisulfite conversion efficiency
+    bad_bsc <- bsc %>%
+        filter(bsc < 80)
+    head(bad_bsc)
 
-  # get the samples to keep
-  keep_bsc <- setdiff(colnames(rgset), rownames(bad_bsc))
-  head(keep_bsc)
-  length(keep_bsc)
+    # get the samples to keep based on bisulfite conversion efficiency
+    keep_bsc <- setdiff(colnames(rgset), rownames(bad_bsc))
+    head(keep_bsc)
+    length(keep_bsc)
   
-  # subset the rgset
-  rgset_bsc <- rgset[,keep_bsc]
-  rgset_bsc
-  rgset
+    # subset the rgset and samples (targets)
+    rgset_bsc <- rgset[,keep_bsc]
+    rgset_bsc
+    rgset
 
-  targets <- targets[targets$sample_id %in% colnames(rgset_bsc), ]
-  print(paste0("sample number : ", ncol(rgset_bsc)))
+    targets <- targets[targets$sample_id %in% colnames(rgset_bsc), ]
+    print(paste0("sample number : ", ncol(rgset_bsc)))
   
   
-  # use contol_metrics function from ewastools to remove failed samples
-  print("use contol_metrics function from ewastools to remove failed samples")
-  head(targets)
+    # -- Control metrics from ewastools -- #
+    # use contol_metrics function from ewastools to remove failed samples
+    print("use contol_metrics function from ewastools to remove failed samples")
+    head(targets)
   
-  # need to get filepath for each samples' idats
-  # read in idats for the control_metrics function
-  meth <- read_idats(targets$Basename, quiet = FALSE) 
-  names(meth)
-  head(meth$meta)
+    # need to get filepath for each samples' idats
+    # read in idats for the control_metrics function
+    meth <- read_idats(targets$Basename, quiet = FALSE) 
+    names(meth)
+    head(meth$meta)
 
-  # make sure targets and meth are in same order
-  identical(meth$meta$sample_id, targets$sample_id)
+    # make sure targets and meth are in same order
+    stopifnot(identical(meth$meta$sample_id, targets$sample_id))
   
-  # get control metrics defined by illumina using ewastools
-  ctrls <- control_metrics(meth)
-  head(ctrls)
+    # get control metrics defined by illumina using ewastools
+    ctrls <- control_metrics(meth)
+    head(ctrls)
 
-  targets$failed <- sample_failure(ctrls) # check for failed samples
-  table(targets$failed) # 85 samples failed
+    # mark samples that fail
+    targets$failed <- sample_failure(ctrls) # check for failed samples
+    table(targets$failed) # 85 samples failed
 
-  # filter to those that passed filtering
-  targets_qcfilt <- targets %>%
-      filter(!failed)
-  head(targets_qcfilt)
-  dim(targets_qcfilt)
-  dim(targets)
+    # filter out failed sample
+    targets_qcfilt <- targets %>%
+        filter(!failed)
+    head(targets_qcfilt)
+    dim(targets_qcfilt)
+    dim(targets)
 
-  rgset_qcfilt <- rgset_bsc[, targets_qcfilt$sample_id]
-  rgset_qcfilt # 84 samples removed
+    rgset_qcfilt <- rgset_bsc[, targets_qcfilt$sample_id]
+    rgset_qcfilt # 84 samples removed
 
-  print(paste0("sample number: ", nrow(targets_qcfilt)))
-
-  
-  # save files
-  print("sample filtering done. saving new datasets:")
-  
-  savefile <- paste0(savedir, "rgset_qcsfilt_hg19.rds")
-  saveRDS(rgset_qcfilt, savefile)
-
-  rgset <- readRDS(savefile)
-  
-  savefile <- paste0(savedir, "targets_qcsfilt_hg19.rds")
-  saveRDS(targets_qcfilt, savefile)
-
-  targets <- readRDS(savefile)
+    print(paste0("sample number: ", nrow(targets_qcfilt)))
 
   
-  res <- list(rgset_qcfilt=rgset,
-       targets_qcfilt=targets)
-  res
+    # -- Saveing filtered data -- #
+    print("sample filtering done. saving new datasets:")
+
+    savefile <- paste0(savedir, "rgset_qcsfilt_hg19.rds")
+    saveRDS(rgset_qcfilt, savefile)
+
+
+    savefile <- paste0(savedir, "targets_qcsfilt_hg19.rds")
+    saveRDS(targets_qcfilt, savefile)
+
+    # used for rerunning without having
+    # to run previous step
+    rgset <- readRDS(savefile)
+    targets <- readRDS(savefile)
+  
+    res <- list(rgset_qcfilt=rgset,
+        targets_qcfilt=targets)
+    res
 }
 
 
-rgset <- rgset_raw # set this for manual testing
 preprocess_pipeline <- function(targets, rgset){
-  # first running quality control on samples 
-  # (checking bisuflite conversion, snp heatmaps and 
-  # ewastools quality control to remove any outlier samples, 
-  # this is done on full dataset
-  res <- qualitycontrol_samples(targets, rgset) 
-  names(res)
-  
-  # set these based on our newly filtered results
-  targets <- res$targets_qcfilt
-  rgset <- res$rgset_qcfilt
-  
+    # first running quality control on samples 
+    # (checking bisuflite conversion, snp heatmaps and 
+    # ewastools quality control to remove any outlier samples, 
+    # this is done on full dataset
+    print("Step 1: Running initial quality control on samples.")
+    res <- qualitycontrol_samples(targets, rgset) 
+    names(res)
 
-  # check quality of probes in each sample and remove probes with low quality 
-  # (hight detection p-value detP > 0.01, beadcount, 
-  # remove probes on sex chromosomes and remove cross-reactive probes. 
-  # Finally remove do dye-bias-correction using noob and normalization 
-  # using bmiq and remove all technical and biological replicates)
-  qc_probes_norm_remove_reps(targets, rgset)
+    # Extract filtered targets and rgset based on QC results
+    targets <- res$targets_qcfilt
+    rgset <- res$rgset_qcfilt
+
+    # check quality of probes in each sample and remove probes with low quality 
+    # (hight detection p-value detP > 0.01, beadcount, 
+    # remove probes on sex chromosomes and remove cross-reactive probes. 
+    # Finally remove do dye-bias-correction using noob and normalization 
+    # using bmiq and remove all technical and biological replicates)
+    qc_probes_norm_remove_reps(targets, rgset)
 }
 
 
 # -- PART 2
 # bmiq normalization
 bmiq_norm <- function(targets_champ, betas_champ){
-  # BMIQ normalization 
-  print(paste0("starting bmiq normalization"))
-  betas_bmiq <<- champ.norm(beta = betas_champ, 
+    # BMIQ normalization 
+    print(paste0("starting bmiq normalization"))
+    betas_bmiq <- champ.norm(beta = betas_champ, 
                             method = "BMIQ", 
                             plotBMIQ = FALSE, 
                             arraytype = "450K", cores = 1)
-  
-  savefile <- paste0(savedir, "betas_bmiq.rds")
-  saveRDS(betas_bmiq, savefile)
 
-  savefile <- paste0(savedir, "targets_bmiq.rds")
-  saveRDS(targets_champ, savefile)
+    # save the results from this step
+    savefile <- paste0(savedir, "betas_bmiq.rds")
+    saveRDS(betas_bmiq, savefile)
 
-  
-  print("bmiq done and results saved")
-}
+    savefile <- paste0(savedir, "targets_bmiq.rds")
+    saveRDS(targets_champ, savefile)
 
-# remove biological and technical replicates 
-remove_reps <- function(targets_ewasfilt_bmiq_incl_R_850k, beta_ewasfilt_bmiq_incl_R_850k){
-  # remove technical and biological replicates
-  print(paste0("removing tR and bR"))
-  print(paste0("number of bR: " , sum(targets_ewasfilt_bmiq_incl_R_850k$biological_replicate == 1)))
-  print(paste0("number of tR: " , sum(targets_ewasfilt_bmiq_incl_R_850k$technical_replicate == 1)))
-  
-  targets_ewasfilt_bmiq_orig_850k <<- targets[targets$original == 1,]
-  beta_ewasfilt_bmiq_orig_850k <<- beta[ ,colnames(beta)%in% targets_ewasfilt_bmiq_orig_850k$sample_id]
-  
-  saveRDS(beta_ewasfilt_bmiq_orig_850k, file =  paste0(savedir, "beta_ewasfilt_bmiq_orig_850k.rds"))
-  saveRDS(targets_ewasfilt_bmiq_orig_850k, file = paste0(savedir, "targets_ewasfilt_bmiq_orig_850k.rds"))
-  print(paste0("tR and bR removed, new datasets saved. finished analysis for brain region, total count of samples: ", 
-               nrow(targets_ewasfilt_bmiq_orig_850k)))
+    print("bmiq done and results saved")
 }
 
 
 filter_snps <- function(betas, targets){
-    # use the genotype VCFs from ROSMAP to get AF
 
+    # -- filter snps based on allele frequency (AF) -- #
+
+    # use the genotype VCFs from ROSMAP to get AF
     head(betas)
     head(targets)
 
     # need to map probes to positions
+    # use the genomic annoations for Illumina 450k
     head(ann450k)
     table(ann450k$Enhancer)
 
@@ -290,6 +264,7 @@ filter_snps <- function(betas, targets){
         mutate(cpg = paste(chr, pos, sep='_'))
     head(pos450k)
 
+    # save for later use
     savefile <- paste0(savedir, "probe_position_map_hg37.rds")
     savefile
     saveRDS(pos450k, savefile)
@@ -300,16 +275,16 @@ filter_snps <- function(betas, targets){
     head(ordered_pos)
 
     # make sure the order matches
-    identical(rownames(ordered_pos), rownames(betas))
-
+    stopifnot(identical(rownames(ordered_pos), rownames(betas)))
 
     # read in the annoated vcfs to get AF
-    chrom = 22
-
+    chrom = 22 # for testing 
     process_chrom <- function(chrom){
         print(paste("Processing chrom", chrom, Sys.time()))
-        # read in the 
-        datafile <- paste0("../../../data/rosmap_wgs_harmonization_variant_calling/NIA_JG_1898_samples_GRM_WGS_b37_JointAnalysis01_2017-12-08_", chrom,
+
+        # read in the variant annotation file
+        datafile <- paste0("../../../data/rosmap_wgs_harmonization_variant_calling/",
+                           "NIA_JG_1898_samples_GRM_WGS_b37_JointAnalysis01_2017-12-08_", chrom,
                            ".recalibrated_variants.annotated.vcf.gz")
         annots <- fread(datafile, skip='#CHROM')
         head(annots)
@@ -324,7 +299,7 @@ filter_snps <- function(betas, targets){
 
         summary(formatted_annots$AF)
 
-        # subset to SNPS with AF > 0.01
+        # subset to SNPS with AF > thresh
         thresh=0
         remove_snps <- formatted_annots %>%
             filter(AF > thresh)
@@ -387,10 +362,7 @@ filter_snps <- function(betas, targets){
     head(filtered_probes)
     nrow(filtered_probes)
 
-
     table(matched_snps$chr)
-
-
 
     # filter betas to match
     head(betas)
@@ -597,8 +569,6 @@ qc_probes_norm_remove_reps <- function(targets, rgset) {
     # bmiq normalization  
   bmiq_norm(targets_champ, betas_champ)
   
-  # this removes technical/biological replicates - we don't have these so okay to skip
-   #remove_reps(targets_ewasfilt_bmiq_incl_R_850k, beta_ewasfilt_bmiq_incl_R_850k)
 
   savefile <- paste0(savedir, "betas_bmiq.rds")
   betas <- readRDS(savefile)
