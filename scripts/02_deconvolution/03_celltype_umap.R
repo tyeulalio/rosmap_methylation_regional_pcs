@@ -272,6 +272,169 @@ load_schizo <- function(){
     schizo_betas
 }
 
+cluster_data <- function(formatted_meth, cleaned_mvals){
+    # try clustering the data to see if schizo cell types cluster with 
+    # deconvovled cell types
+
+    # read the PCs from the UMAP script 03
+    savefile <- paste0(savedir, "celltype_pcs.rds")
+    savefile
+    if (cleaned_mvals){
+        savefile <- paste0(savedir, "int_cleaned_celltype_pcs.rds")
+    }
+    if (include_schizo){
+        savefile <- paste0(savedir, "schizo_int_celltype_pcs.rds")
+    }
+    savefile
+    pcs <- readRDS(savefile)
+    pcs <- pcs[-1,] # remove the variance explained row
+    head(pcs)
+    dim(pcs)
+    tail(pcs)
+
+    ## -- this code is run interactively to adjust for the different runs
+    # remove bulk from cell type analysis
+    # adjust the celltype filter here for each analysis
+    pcs_sub_celltype <- pcs %>%
+        rownames_to_column('sample_celltype') %>%
+        separate(sample_celltype, c('sample', 'cell_type'), sep='_', remove=FALSE, extra='merge') %>%
+        filter(!cell_type %in% c('bulk', 'NeuN')) %>%
+        #filter(!cell_type %in% c('bulk', 'Olig2')) %>%
+        #filter(!cell_type %in% c('bulk')) %>%
+        select(-sample, -cell_type) %>%
+        column_to_rownames('sample_celltype')
+    head(pcs_sub_celltype)
+    dim(pcs_sub_celltype)
+
+    # try a k-means clustering on the PCs
+    set.seed(1174117174)
+    centers=5 # adjust number of clusters as needed
+    km_out <- kmeans(pcs_sub_celltype, centers=centers, nstart=20) 
+    km_out
+
+    # use this to compute silhouette distance for the clusters
+    distmat <- dist(pcs_sub_celltype)
+    dim(pcs_sub_celltype)
+    length(distmat)
+    silhouette_res <- silhouette(km_out$cluster, distmat)
+    summary(silhouette_res)
+
+
+    # deconvolved only cell types
+    deconvolved_only=FALSE
+    if (deconvolved_only){
+        # checking if cell types cluster together
+        names(km_out) 
+        clusters <- data.frame(cluster=km_out$cluster) %>%
+            rownames_to_column('sample_id') %>%
+            separate(sample_id, c('sample_id', 'cell_type'), sep='_', extra='merge')
+        head(clusters)
+        unique(clusters$cell_type)
+        table(clusters$cell_type, clusters$cluster)
+
+        # plotting silhouette distances
+        silhouette_df <- data.frame(cluster=factor(km_out$cluster),
+                                    silhouette_width=silhouette_res[,'sil_width']
+        )
+        p <- ggplot(silhouette_df, aes(x=cluster, y=silhouette_width, fill=cluster))+
+            geom_boxplot() +
+            theme_bw()
+        (savefile <- paste0(savedir, "silhouette_dist_deconvolved_cell_types.png"))
+        ggsave(p, file=savefile)
+    }
+
+    # create two clusterings, holding out one of the sorted cell types
+    # or else they cluster together
+    olig_km_out <- km_out
+    #neun_km_out <- km_out
+
+    head(neun_km_out$cluster)
+
+    neun_clusters <- data.frame(neun_cluster=neun_km_out$cluster) %>%
+        rownames_to_column('sample') 
+    olig_clusters <- data.frame(olig_cluster=olig_km_out$cluster) %>%
+        rownames_to_column('sample') 
+    head(neun_clusters)
+
+    # need to match the correct cluster numbers together across each run
+    # matching cell types should have same cluster number
+    joined_clusters <- full_join(neun_clusters, olig_clusters) %>%
+        #mutate(olig_cluster = ifelse(grepl('neuron', sample), NA, olig_cluster)) %>%
+        #mutate(neun_cluster = ifelse(grepl('oligo_opc', sample), NA, neun_cluster)) %>%
+        mutate(olig_cluster_adj = olig_cluster * 13) %>%
+        separate(sample, c('sample', 'cell_type'), sep='_', remove=FALSE, extra='merge') %>%
+        rowwise() %>%
+        mutate(cluster = sum(neun_cluster, olig_cluster_adj, na.rm=TRUE)) %>%
+        ungroup()
+    head(joined_clusters)
+    tail(joined_clusters)
+
+        
+    # join the km clusters to the PCs
+    head(pcs_sub_celltype)
+    cell_type_colors
+    updated_ct_colors <- cell_type_colors
+    updated_ct_colors['NeuN'] = 'deeppink'
+    updated_ct_colors['Olig2'] = 'darkturquoise'
+
+    # connect umap embedding  to clusters
+    savefile <- paste0(savedir, "celltype_umap_results.rds")
+    umap_res <- readRDS(savefile)
+    head(umap_res)
+    dim(umap_res)
+
+    # plot the cluster results with UMAP layout
+    formatted_clusters <- umap_res %>%
+        rename(cell_type = celltype) %>%
+        #rownames_to_column('sample') %>%
+        left_join(joined_clusters) %>%
+        #separate(sample, c('sample', 'cell_type'), sep='_', remove=FALSE, extra='merge') %>%
+        left_join(cell_type_map) %>%
+        mutate(formatted_ct = as.character(formatted_ct)) %>%
+        mutate(formatted_ct = ifelse(cell_type %in% c('NeuN', 'Olig2'), cell_type, formatted_ct)) %>%
+        mutate(formatted_ct = fct_relevel(formatted_ct,
+                                          "Bulk", "Astrocyte", "Endothelial", "Neuron", "Oligo/OPC",
+                                          "NeuN", "Olig2")) 
+    head(formatted_clusters)
+    table(formatted_clusters$cluster)
+    table(formatted_clusters$neun_cluster)
+    table(formatted_clusters$olig_cluster_adj)
+
+    dim(formatted_clusters)
+
+    tmp <- formatted_clusters %>%
+        filter(cluster %in% c(52, 55))
+    head(tmp)
+    table(tmp$neun_cluster, tmp$olig_cluster_adj)
+
+    # map the groups manually here
+    formatted_clusters <- formatted_clusters %>%
+        mutate(man_cluster = case_when(cluster %in% c(1,27) ~ 1,
+                                       cluster %in% c(2,13,15) ~ 2,
+                                       cluster %in% c(43) ~ 3,
+                                       cluster %in% c(52,55) ~ 4
+                                       )) 
+    head(formatted_clusters)
+    dim(formatted_clusters)
+
+    table(formatted_clusters$cell_type, formatted_clusters$man_cluster)
+
+
+    (savefile <- paste0(savedir, "kmeans_clusters.png"))
+    p <- ggplot(formatted_clusters) +
+        geom_point(aes(x=UMAP_1, y=UMAP_2, color=formatted_ct, shape=as.factor(man_cluster)), size=3) +
+        theme_bw() +
+        theme(text=element_text(size=18)) +
+        #scale_color_nejm(name="Cell type") +
+        scale_color_manual(values=updated_ct_colors, name="Cell type") +
+        scale_shape_manual(values=c(4,1,2,3), name="Cluster") +
+        xlab("UMAP 1") +
+        ylab("UMAP 2")
+    ggsave(p, file=savefile, width=8, height=8)
+
+    1
+}
+
 main <- function(){
     cell_types <- c('neuron', 'oligo_opc', 'astro', 'endo', 'bulk')
 
@@ -341,6 +504,8 @@ main <- function(){
 
     plot_umap(cleaned_mvals)
 
+    # try a clustering approach
+    cluster_data(formatted_meth, cleaned_mvals)
     1
 }
 
