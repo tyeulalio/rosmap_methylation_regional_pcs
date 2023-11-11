@@ -12,81 +12,16 @@ library(tidyverse)
 
 # summarise gene regions using cpgs, averages, and the pc method
 
-
-sub_chroms = FALSE
-c1_covariates = FALSE
-c2_covariates = TRUE
-reestimate_props = TRUE
+# Set directory variables
+datadir = "/path/to/data"
+savedir = "/path/to/output"
 
 
-jobnum=10
-
-#args = commandArgs(trailingOnly=TRUE)
-
-#jobnum <- args[1] %>%
-    #as.numeric()
-
-
-main_datadir <- paste0("/home/eulalio/deconvolution/new_rosmap/output/02_deconvolution/02_svd_batch_correction/")
-main_savedir <- paste0("../../output/03_summarised_genes/01_summarised_genes/")
-dir.create(main_savedir, showWarnings=FALSE)
-dir.create(main_savedir, showWarnings=FALSE)
-
-paths_file <- paste0("/home/eulalio/deconvolution/new_rosmap/scripts/shared_functions/01_filepaths.R")
-include_study=FALSE # set this because we always include it anyways
-source(paths_file)
-
-datadir
-savedir
-
-# remove randomize_cpgs from datadir
-datadir <- str_remove(datadir, "randomize_cpgs/")
-datadir
-
-cleaned_mvals = TRUE
-if (cleaned_mvals){
-    cleaned_str = "cleaned_"
-} else{
-    cleaned_str = ""
-}
-
-clean_global <- TRUE
-if (clean_global){#  # Tue May 23 18:16:32 2023 ------------------------------
-    cleaned_str <- "cleaned_global_"
-}
-
-precleaned = FALSE
-if (precleaned){
-    precleaned_str = "precleaned_"
-    savedir <- paste0(savedir, "precleaned/")
-    dir.create(savedir)
-} else{
-    precleaned_str = ""
-}
-
-datadir
-savedir
-
-summarize_results = FALSE
-
-
-
+# Load methylation data based on cell type
 load_methylation <- function(cell_type){
     # read in the mvals before and after batch correction
 
-    if (cell_type == 'bulk' | cleaned_mvals){
-        # use the cleaned bulk data - batch removed with removeBatchEffect
-        list.files(datadir)
-        datafile <- paste0(datadir, precleaned_str, cleaned_str, cell_type, "_cleaned_meth.rds")
-    } else{
-        # load appropriate methylation
-        datafile <- paste0(datadir, precleaned_str, cell_type, "_formatted_meth.rds")
-    }
-    if (clean_global){
-        datafile <- paste0(datadir, precleaned_str, cleaned_str, cell_type, "_cleaned_meth.rds")
-    }
-
-    datafile
+    datafile <- paste0(datadir, cell_type, "_cleaned_meth.rds")
     mvals <- readRDS(datafile)
     head(mvals)
     dim(mvals)
@@ -94,39 +29,32 @@ load_methylation <- function(cell_type){
     mvals
 }
 
+# Liftover methylation data
 lift_methylation <- function(mvals, cell_type){
     # liftOver the methylation data from 
     # hg19 to hg38
 
-
     # import the chain file
-    datafile <- paste0("/home/eulalio/deconvolution/data/hg19ToHg38.over.chain")
+    datafile <- paste0("/path/to/chainfile/data/hg19ToHg38.over.chain")
     ch = import.chain(datafile)
-
 
     # use the rnbeads hg19 annotations    
     cpg_annots <- rnb.annotation2data.frame(rnb.get.annotation(type='probes450', assembly='hg19'))
     head(cpg_annots)
 
-    head(mvals)
-
+    # subset annotations to include only CpGs present in the methylation data
+    # get the cpg names
     cpgs <- rownames(mvals)
     head(cpgs)
 
-    #if (cell_type == 'bulk'){
-        tmp <- cpg_annots %>%
-            mutate(cpg = paste(Chromosome, Start, sep='_')) %>%
-            rownames_to_column('rn') %>%
-            column_to_rownames('cpg')
-        head(tmp)
+    tmp <- cpg_annots %>%
+        mutate(cpg = paste(Chromosome, Start, sep='_')) %>%
+        rownames_to_column('rn') %>%
+        column_to_rownames('cpg')
+    head(tmp)
 
-        sub_annots <- tmp[cpgs,] 
-        head(sub_annots)
-    #} else{
-        #sub_annots <- cpg_annots[cpgs,] 
-        #head(sub_annots)
-    #}
-
+    sub_annots <- tmp[cpgs,] 
+    head(sub_annots)
 
     dim(sub_annots)
     dim(mvals)
@@ -137,7 +65,8 @@ lift_methylation <- function(mvals, cell_type){
     mvals_gr <- makeGRangesFromDataFrame(sub_annots)
     mvals_gr
 
-    mvals38 <- liftOver(mvals_gr, ch) %>% as.data.frame()
+    mvals38 <- liftOver(mvals_gr, ch) %>% 
+        as.data.frame()
     head(mvals38)
 
     # we lose some cpgs after the liftOver
@@ -172,7 +101,7 @@ lift_methylation <- function(mvals, cell_type){
 get_annotations <- function(region_type){
     # use the rnbeads hg38 annotations    
     if (region_type == 'enhancers'){
-        datadir <- paste0("/home/eulalio/deconvolution/rosmap/output/annotate_regions/01_annotate_sites/")
+        datadir <- paste0("/path/to/annotate_regions/01_annotate_sites/")
         datafiles <- list.files(datadir) %>% str_subset('enhancer_annots')
         datafiles
 
@@ -197,7 +126,7 @@ get_annotations <- function(region_type){
     } else{
         if (region_type == 'gene_body'){
             # load the full gene results
-            datafile <- paste0("/home/eulalio/deconvolution/rosmap/output/annotate_regions/01_annotate_sites/", "full_gene", "_hg38_annotations.rds")
+            datafile <- paste0("/path/to/annotate_regions/01_annotate_sites/", "full_gene", "_hg38_annotations.rds")
             annots <- readRDS(datafile)
             head(annots)
 
@@ -212,7 +141,7 @@ get_annotations <- function(region_type){
         } else{
             if (region_type == 'preTSS'){
                 # load the full gene results
-                datafile <- paste0("/home/eulalio/deconvolution/rosmap/output/annotate_regions/01_annotate_sites/", "full_gene", "_hg38_annotations.rds")
+                datafile <- paste0("/path/to/annotate_regions/01_annotate_sites/", "full_gene", "_hg38_annotations.rds")
                 annots <- readRDS(datafile)
                 head(annots)
 
@@ -226,7 +155,7 @@ get_annotations <- function(region_type){
                 annots <- filtered_annots
             } else{
                 # load the compiled annotations
-                datafile <- paste0("/home/eulalio/deconvolution/rosmap/output/annotate_regions/01_annotate_sites/", region_type, "_hg38_annotations.rds")
+                datafile <- paste0("/path/to/annotate_regions/01_annotate_sites/", region_type, "_hg38_annotations.rds")
                 annots <- readRDS(datafile)
                 head(annots)
             }
@@ -234,52 +163,11 @@ get_annotations <- function(region_type){
         }
     }
 
-
-
-
-    #if (region_type == 'expanded_promoter'){
-        #annots <- rnb.annotation2data.frame(rnb.get.annotation(type='promoters', assembly='hg38'))
-        #head(annots)
-        #enhancer_range = 1e6
-
-         ## get granged for annotations
-        #annots_gr <- makeGRangesFromDataFrame(annots, keep.extra.columns=TRUE)
-        #head(annots_gr)
-
-        ## expand the range
-
-        ## use this to extend the range of the genomic regions
-        #extend <- function(x, upstream=0, downstream=0)     
-        #{
-            #if (any(strand(x) == "*"))
-                #warning("'*' ranges were treated as '+'")
-            #on_plus <- strand(x) == "+" | strand(x) == "*"
-            #new_start <- start(x) - ifelse(on_plus, upstream, downstream)
-            #new_end <- end(x) + ifelse(on_plus, downstream, upstream)
-            #ranges(x) <- IRanges(new_start, new_end)
-            #trim(x)
-        #}
-
-
-        ## expand the range for each promoter region
-        #extended_gr <- extend(annots_gr, enhancer_range, enhancer_range)
-        #extended_gr
-
-         #annots_gr
-
-        ## get dataframe from gr
-        #annots <- data.frame(extended_gr)
-
-    #} else{
-        #annots <- rnb.annotation2data.frame(rnb.get.annotation(type=region_type, assembly='hg38'))
-    #}
-
     head(annots)
     unique(annots$type)
 
     # attach gene biotype info 
-    #savefile <- paste0(savedir, "gene_biomart_annots.csv")
-    savefile <- paste0("/home/eulalio/deconvolution/data/gene_biomart_table.csv")
+    savefile <- paste0(datadir, "gene_biomart_table.csv")
     if (!file.exists(savefile)){
         ensembl <- useEnsembl(biomart='genes', dataset='hsapiens_gene_ensembl')
         latt <- listAttributes(ensembl)
@@ -297,8 +185,6 @@ get_annotations <- function(region_type){
             rename(gene_id=ensembl_gene_id, symbol=hgnc_symbol, biotype=gene_biotype) 
         head(gene_annots)
 
-        #savefile <- paste0(savedir, "gene_biomart_annots.csv")
-        #savefile
         write_csv(gene_annots, savefile)
     }
 
@@ -307,33 +193,15 @@ get_annotations <- function(region_type){
     head(gene_annots)
     head(annots)
 
-    if (region_type == 'astro_enh'){
-        full_annots <- annots %>%
-            #rename(ensembl_gene_id_version = gencode_gene_id) %>%
-            left_join(gene_annots) %>%
-            select(-gene_id, gene_id = ensembl_gene_id_version) %>%
-            #separate(gencode_region, c('chrom', 'start', 'end'), sep='_') %>%
-            #select(chrom, start, end, everything()) %>%
-            select(-strand)
-    } else{
-        full_annots <- annots %>%
-            rename(ensembl_gene_id_version = gencode_gene_id) %>%
-            left_join(gene_annots) %>%
-            select(-gene_id, gene_id = ensembl_gene_id_version) %>%
-            #separate(gencode_region, c('chrom', 'start', 'end'), sep='_') %>%
-            #select(chrom, start, end, everything()) %>%
-            select(-strand)
-    }
+    full_annots <- annots %>%
+        rename(ensembl_gene_id_version = gencode_gene_id) %>%
+        left_join(gene_annots) %>%
+        select(-gene_id, gene_id = ensembl_gene_id_version) %>%
+        select(-strand)
     head(full_annots)
 
     table(full_annots$biotype, useNA='ifany')
     region_type
-
-    # filter down to protein coding for now
-    #keep_annots <- full_annots %>%
-        #filter(biotype == 'protein_coding')
-    #head(keep_annots)
-    #dim(keep_annots)
 
     annots_savedir <- paste0(savedir, "annotated_regions/")
     dir.create(annots_savedir, showWarnings=FALSE)
@@ -343,179 +211,6 @@ get_annotations <- function(region_type){
 
     full_annots
 }
-
-
-
-#get_annotations <- function(region_type){
-    ## use the rnbeads hg38 annotations    
-    #if (region_type == 'enhancers'){
-        #savefile <- paste0(savedir, "abc_enhancers_hg38.csv")
-        #savefile
-        #if (file.exists(savefile)){
-            #print(paste("Enhancer annotations exist. Loading file."))
-            #keep_annots <- read_csv(savefile)
-            #return(keep_annots)
-        #}
-        ## read in abc enhancer file
-        #datafile <- paste0("/home/eulalio/deconvolution/data/AllPredictions.AvgHiC.ABC0.015.minus150.ForABCPaperV3.txt")
-        #abc_enhancers <- read_tsv(datafile)
-        #head(abc_enhancers)
-
-        ## celltypes of interest
-        #abc_celltypes <- c('astrocyte-ENCODE', 'endothelial_cell_of_umbilical_vein-Roadmap', 
-                           #'bipolar_neuron_from_iPSC-ENCODE', 'H1_Derived_Neuronal_Progenitor_Cultured_Cells-Roadmap')
-        #filtered_abc <- abc_enhancers %>%
-            #filter(CellType %in% abc_celltypes)
-        #head(filtered_abc)
-        
-        #summary(filtered_abc$ABC.Score)
-
-        ## use cut-offs from paper
-        ## ABC.Score >= 0.02
-        #scored_abc <- filtered_abc %>%
-            #filter(ABC.Score >= 0.02)
-        #dim(filtered_abc)
-        #dim(scored_abc)
-
-        ## need to liftover to hg38 from hg19
-        #chain <- import.chain("/home/eulalio/deconvolution/data/hg19ToHg38.over.chain")
-        #gr_abc <- makeGRangesFromDataFrame(scored_abc, keep.extra.columns=TRUE)
-        #head(gr_abc)
-
-        #gr_abc_hg38 <- liftOver(gr_abc, chain)
-        #head(gr_abc_hg38)
-
-        ## convert lifted data to data frame
-        #abc_hg38 <- as.data.frame(gr_abc_hg38)
-        #head(abc_hg38)
-
-        ## convert target gnee symbols to enseml ids
-        #bm_file <- paste0("/home/eulalio/deconvolution/data/full_biomart_table.csv")
-        #bm <- read_csv(bm_file)
-        #head(bm)
-        #head(abc_hg38)
-
-        #abc_hg38_genes <- abc_hg38 %>%
-            #mutate(Symbol = TargetGene) %>%
-            #left_join(bm)
-        #head(abc_hg38_genes)
-
-        #unique(abc_hg38_genes$Gene_biotype)
-
-        ## filter for protein coding genes
-        #abc_hg38_formatted <- abc_hg38_genes %>%
-            #filter(Gene_biotype == 'protein_coding') %>%
-            #select(-group, -group_name)
-        #head(abc_hg38_formatted)
-        #dim(abc_hg38_formatted)
-        #dim(abc_hg38_genes)
-
-
-
-        ## get the important columns to match the other annotations
-        #head(abc_hg38_formatted)
-        ##head(promoter_annots)
-
-        #keep_annots <- abc_hg38_formatted %>%
-            #select(Chromosome=seqnames, Start=start, End=end, Strand=strand,
-                    #symbol=Symbol, gene_id=Ensembl_ID, biotype=Gene_biotype, celltype=CellType) %>%
-            #mutate(gene_id = paste0(gene_id, "__", celltype))
-        #head(keep_annots)
-
-        ## save the lifted file
-        #savefile <- paste0(savedir, "abc_enhancers_hg38.csv")
-        #savefile
-        #write_csv(keep_annots, savefile)
-
-        #return(keep_annots)
-    #}
-
-    #if (region_type == 'expanded_promoter'){
-        #annots <- rnb.annotation2data.frame(rnb.get.annotation(type='promoters', assembly='hg38'))
-        #head(annots)
-        #enhancer_range = 1e6
-
-         ## get granged for annotations
-        #annots_gr <- makeGRangesFromDataFrame(annots, keep.extra.columns=TRUE)
-        #head(annots_gr)
-
-        ## expand the range
-
-        ## use this to extend the range of the genomic regions
-        #extend <- function(x, upstream=0, downstream=0)     
-        #{
-            #if (any(strand(x) == "*"))
-                #warning("'*' ranges were treated as '+'")
-            #on_plus <- strand(x) == "+" | strand(x) == "*"
-            #new_start <- start(x) - ifelse(on_plus, upstream, downstream)
-            #new_end <- end(x) + ifelse(on_plus, downstream, upstream)
-            #ranges(x) <- IRanges(new_start, new_end)
-            #trim(x)
-        #}
-
-
-        ## expand the range for each promoter region
-        #extended_gr <- extend(annots_gr, enhancer_range, enhancer_range)
-        #extended_gr
-
-         #annots_gr
-
-        ## get dataframe from gr
-        #annots <- data.frame(extended_gr)
-
-    #} else{
-        #annots <- rnb.annotation2data.frame(rnb.get.annotation(type=region_type, assembly='hg38'))
-    #}
-
-    #head(annots)
-
-    ## attach gene biotype info 
-    #savefile <- paste0(savedir, "gene_biomart_annots.csv")
-    #if (!file.exists(savefile)){
-        #ensembl <- useEnsembl(biomart='genes', dataset='hsapiens_gene_ensembl')
-        #latt <- listAttributes(ensembl)
-        #latt[1:100,]
-        #atts <- c('ensembl_gene_id_version', 'ensembl_gene_id', 'hgnc_symbol', 'description', 'gene_biotype')
-
-        #full_bm <- getBM(
-                    #attributes = atts,
-                    #mart = ensembl
-                    #)
-        #head(full_bm)
-
-        ## rename bm columns to match
-        #gene_annots <- full_bm %>%
-            #rename(gene_id=ensembl_gene_id, symbol=hgnc_symbol, biotype=gene_biotype) 
-        #head(gene_annots)
-
-        #savefile <- paste0(savedir, "gene_biomart_annots.csv")
-        #savefile
-        #write_csv(gene_annots, savefile)
-    #}
-
-    #gene_annots <- read_csv(savefile)
-
-    #head(gene_annots)
-    #head(annots)
-
-    #full_annots <- annots %>%
-        #rename(gene_id = ID, rnbeads_symbol=symbol) %>%
-        #left_join(gene_annots)
-    #head(full_annots)
-
-    #table(full_annots$biotype, useNA='ifany')
-    #region_type
-
-    ## filter down to protein coding for now
-    #keep_annots <- full_annots %>%
-        #filter(biotype == 'protein_coding')
-    #head(keep_annots)
-    #dim(keep_annots)
-
-
-    #keep_annots
-#}
-
 
 get_pcs <- function(gene_mvals){
     # estimate dims and get sig pcs for this gene
@@ -679,16 +374,6 @@ select_genes <- function(array_idx, mvals, gene_map, region_type, cell_type, cle
     head(mvals)
     head(gene_map)
 
-
-    #pc_dir <- paste0(savedir, cleaned_str, region_type, "_", cell_type, "_summaries/")
-    #savefile <- paste0(pc_dir, cleaned_str, region_type, "_", cell_type, "_gene_avgs_", array_idx, ".rds")
-    #savefile
-    #if (file.exists(savefile)){
-        #print("output exists. returning.")
-        #return(NA)
-    #}
-
-
     # mvals are NOT centered and scaled prior
     # to computing averages
 
@@ -739,7 +424,6 @@ select_genes <- function(array_idx, mvals, gene_map, region_type, cell_type, cle
     job_map
 }
 
-#summary_type = "pcs"
 summarise_genes <- function(mvals, job_map, summary_type){ 
     print(paste("Summarizing genes with", summary_type))
 
@@ -825,14 +509,6 @@ summarise_genes <- function(mvals, job_map, summary_type){
                             pc_info=pc_info,
                             gene_id=gene))
             } 
-            #else{ # error occurred
-                #formatted_pcs = data.frame(row.names=c(ordered_samples, 'num_cpgs', 'est_dim', 'error', 'duration_secs'), 
-                                           #gene=rep(NA, length(ordered_samples)+4)) %>% t() %>% as.data.frame()
-                #formatted_pcs$error = as.character(pc_res$error)
-                #formatted_pcs$num_cpgs = num_cpgs
-                #rownames(formatted_pcs) = gene
-                #head(formatted_pcs)
-            #}
         }
     }
 
@@ -883,6 +559,7 @@ summarise_genes <- function(mvals, job_map, summary_type){
 }
 
 
+# combines results across batch jobs
 combine_results <- function(){
     region_types <- c(
                       'promoters', 'exons', 'introns',
@@ -893,24 +570,14 @@ combine_results <- function(){
                         )
     region_idx <- 12
     region_types <- c(region_types[region_idx])
-    # for testing
-    #region_types <- c('introns')
-    cell_types <- c('astro', 'endo', 'neuron', 'oligo_opc', 'bulk')
 
-    #cell_types <- c('astro')
+    # for testing
+    cell_types <- c('astro', 'endo', 'neuron', 'oligo_opc', 'bulk')
     region_types
 
-    #region_idx <- 1
-    #celltype_idx <- 1
-
-    #region_type <- region_types[region_idx]
-    #cell_type <- cell_types[celltype_idx]
-
-    
     total_jobs <- 100
     num_jobs = total_jobs
 
-    #process_celltype(cell_type)
 
     runs <- expand.grid(cell_type=cell_types,
                         region_type=region_types
@@ -924,15 +591,9 @@ combine_results <- function(){
         cell_type <- run[['cell_type']]
             
         print(paste("Processing", region_type, cell_type, Sys.time()))
-        #pc_dir <- paste0(savedir, cleaned_str, region_type, "_", cell_type, "_summaries/")
-        #pc_dir
-
-        #list.files(pc_dir)
 
         ## -- load pcs
         load_pcs <- function(array_idx){
-            #savefile <- paste0(pc_dir, cleaned_str, region_type, "_", cell_type, "_gene_pcs_", array_idx, ".rds")
-            #savefile
             summary_type <- "pcs"
             savepath <- paste(summary_type, region_type, cell_type, sep='_')
             pc_dir <- paste0(savedir, savepath, "/")
@@ -991,8 +652,6 @@ combine_results <- function(){
             avg_dir <- paste0(savedir, savepath, "/")
             savefile <- paste0(avg_dir, savepath, array_idx, "_summaries.rds")
             savefile
-            #savefile <- paste0(pc_dir, cleaned_str, region_type, "_", cell_type, "_gene_avgs_", array_idx, ".rds")
-            #savefile
 
             if (!file.exists(savefile)){
                 print(paste("Avgs file", array_idx, "does not exists"))
@@ -1024,7 +683,6 @@ combine_results <- function(){
 }
 
 
-#mvals <- cleaned_mvals
 compute_pcs <- function(mvals, gene_map, region_type, array_idx, cell_type, cleaned_str){
     # summarise the regions using averages and PCs
 
@@ -1168,12 +826,8 @@ map_cpgs <- function(lifted_mvals, annots, region_type, cell_type){
     }
 
 
-    #names(lifted_mvals)
-
     mvals <- lifted_mvals
     head(mvals)
-
-
 
     # create gr annots and for cpgs
     cpgs <- data.frame(cpgs=(rownames(mvals))) %>%
@@ -1326,9 +980,8 @@ save_results <- function(gene_summaries, summary_type, region_type, cell_type, a
 
 
 main <- function(array_idx, region_idx, celltype_idx){
-    # load methylation data 
+    # cell types and region types
     cell_types <- c('astro', 'endo', 'neuron', 'oligo_opc', 'bulk')
-    #cell_types <- c('endo', 'neuron', 'oligo_opc', 'bulk')
     region_types <- c(
                       'promoters', 'exons', 'introns',
                       '1to5kb', '5UTRs', '3UTRs',
@@ -1337,15 +990,8 @@ main <- function(array_idx, region_idx, celltype_idx){
                       'astro_enh', 'gene_body', 'preTSS'
                         )
 
-    # for testing
-    testing=FALSE
-    if (testing){
-        cell_type <- cell_types[1]
-        region_idx <- 13
-    }
-
+    # process each cell type
     process_celltype <- function(cell_type){ 
-
         print(paste("Loading data for", cell_type, Sys.time()))
 
         # lift cpgs to hg38 if we didn't do this yet
@@ -1367,22 +1013,6 @@ main <- function(array_idx, region_idx, celltype_idx){
 
         dim(lifted_mvals)
 
-        if (randomize_cpgs){
-            print(paste("Randomizing CpG order"))
-            # permute the CpG labels
-            head(lifted_mvals)[,1:10]
-
-            set.seed(1174117171)
-            permuted_cpgs <- rownames(lifted_mvals)[sample(1:nrow(lifted_mvals), nrow(lifted_mvals), replace=FALSE)]
-            head(permuted_cpgs)
-            head(rownames(lifted_mvals))
-
-            rownames(lifted_mvals) <- permuted_cpgs
-            head(rownames(lifted_mvals))
-        }
-
-
-
         # assign the region type here
         region_type <- region_types[region_idx]
 
@@ -1392,18 +1022,15 @@ main <- function(array_idx, region_idx, celltype_idx){
         head(annots)
         print(paste("Number of genes in", region_type, length(unique(annots$gene_id))))
 
-
         # map cpgs to regions
         print(paste("Mapping cpgs", Sys.time()))
         gene_map <- map_cpgs(lifted_mvals, annots, region_type, cell_type)
         head(gene_map)
 
-
         # select the mvals to use
         mvals <- lifted_mvals
         head(mvals)
         dim(mvals)
-
 
         # filter down map to the genes that we will process
         job_map <- select_genes(array_idx, mvals, gene_map, region_type, cell_type, cleaned_str)
@@ -1413,7 +1040,6 @@ main <- function(array_idx, region_idx, celltype_idx){
         gene_summaries <- summarise_genes(mvals, job_map, summary_type)
         # save results
         save_results(gene_summaries, summary_type, region_type, cell_type, array_idx)
-
 
         summary_type = 'pcs'
         gene_summaries <- summarise_genes(mvals, job_map, summary_type)
@@ -1430,7 +1056,6 @@ main <- function(array_idx, region_idx, celltype_idx){
 # for testing
 #region_types
 #cell_types
-
 region_idx = 13
 array_idx = 0
 celltype_idx = 5
@@ -1451,11 +1076,7 @@ if (summarize_results){
     quit()
 }
 
-#for (array_idx in 1:99){
-    #print(paste("Processing", region_types[region_idx]))
-    main(array_idx, region_idx, celltype_idx)
-#}
-
+main(array_idx, region_idx, celltype_idx)
 
 quit()
 
