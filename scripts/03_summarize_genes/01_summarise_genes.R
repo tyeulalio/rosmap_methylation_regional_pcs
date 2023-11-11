@@ -871,64 +871,6 @@ map_cpgs <- function(lifted_mvals, annots, region_type, cell_type){
     gene_map
 }
 
-# -- NOT IN USE -- USE NEXT DMP SCRIPT!!! --- 
-consolidate_pcs <- function(){
-    # do not call this function 
-    # just run on interactive session to consolidate
-    # results from all of the jobs
-    region_idx = 2
-    region_types <- c('genes', 'promoters', 'expanded_promoter', 'enhancers')
-    region_type <- region_types[region_idx]
-
-    cell_types <- c('astro', 'endo', 'neuron', 'oligo_opc', 'bulk')
-    #cleaned_strs <- c("", "cleaned_")
-
-    cell_type <- cell_types[celltype_idx]
-
-
-    num_jobs = 100
-
-
-    # load the data and combine
-    load_data <- function(array_idx){
-        datafile <- paste0(pc_dir, cleaned_str, region_type, cell_type, "_pcs.rds")
-        datafile
-
-        if (!file.exists(datafile)) return(NA)
-
-        pcs <- readRDS(datafile)
-        head(pcs)
-
-        pcs
-    }
-
-
-    # -- mvals before cleaning first
-    cleaned_str = ""
-    "../../output/episcore/03_summarised_genes/includeCovariates/genesastro_pcs"
-    pc_dir <- paste0(savedir, cleaned_str, region_type, "_pcs/")
-    all_pcs <- lapply(1:num_jobs, load_data)
-    pcs_df <- do.call(rbind, all_pcs)
-    head(pcs_df)
-    dim(pcs_df)
-
-    savefile <- paste0(savedir, cleaned_str, region_type, "_combined_pcs.rds")
-    savefile
-    saveRDS(pcs_df, savefile)
-
-
-    # -- mvals after cleaning 
-    cleaned_str = "cleaned_"
-    pc_dir <- paste0(savedir, cleaned_str, region_type, "_pcs/")
-    all_pcs <- lapply(1:num_jobs, load_data)
-    pcs_df <- do.call(rbind, all_pcs)
-    head(pcs_df)
-    dim(pcs_df)
-
-    savefile <- paste0(savedir, cleaned_str, region_type, "_combined_pcs.rds")
-    savefile
-    saveRDS(pcs_df, savefile)
-}
 
 match_geno <- function(lifted_mvals){
     # keep samples from geno only
