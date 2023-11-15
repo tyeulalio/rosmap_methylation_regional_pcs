@@ -12,7 +12,7 @@ library(tidyverse)
 ## First source both the "RRBSsimulation.R" and "RRBSmodeling.R" scripts and make sure that all required libraries are installed
 ## Install the appropriate packages, some are out of date, you may get
 ## warning messages about invalid components but the code will still run
-setwd("D:/OneDrive/MontgomeryLab/deconvolution/RRBS-sim/")
+#setwd("D:/OneDrive/MontgomeryLab/deconvolution/RRBS-sim/")
 source("RRBSsimulation.R")
 source("RRBSmodeling.R")
 
@@ -223,7 +223,7 @@ get_N_regions <- function(num_sites, num_samples, percent_meth_difference,
     simulated_dat
 }
 
-meth <- avgs # for testing
+#meth <- avgs # for testing
 run_dmp <- function(meth, pheno){
     # run the dmp analysis
     head(meth) 
@@ -457,6 +457,7 @@ main <- function(){
         
 }
 
+main()
 
 
 
