@@ -484,6 +484,22 @@ ___
 
 ## <a name="script2">`02_check_genes.R`</a>
 
+This R script analyzes the summarized genes from script 01. Key functionalities of the script include:
+
+1. **Configuration Setup**: Defining and preparing combinations of gene regions, summary types, and cell types for analysis.
+
+2. **Feature Counting**: Counting features such as CpGs and PCs in different gene regions.
+
+3. **Gene Complexity Correlation Analysis**: Assessing the relationship between gene complexity and relative principal components (rPCs).
+
+4. **Data Loading and Processing**: Loading phenotype and methylation data specific to each combination of region, summary, and cell type.
+
+5. **Global-Local PC Correlation Analysis**: Investigating correlations between local and global principal components to understand broader methylation patterns.
+
+6. **Inter-PC Correlation Analysis**: Analyzing correlations between PCs across different genes to explore genetic interconnectedness across genomic regions.
+
+The script is structured to automate these analyses over a range of specified parameters, making it a powerful tool for in-depth epigenetic research. Its output includes detailed statistical summaries, potential plots, and insights crucial for understanding the epigenetic mechanisms across different cell types and genomic contexts.
+
 
 ### <a name="load_pheno2">`load_pheno`</a>
 
