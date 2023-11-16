@@ -1,6 +1,6 @@
 # Cell type deconvolution and Batch correction
 
-This pipeline contains a set of functions designed to deconvolve cell type-specific methylation  and perform batch correction.
+This pipeline contains a set of functions designed to deconvolve cell type-specific methylation and perform batch correction.
 
 ## Table of Contents
 
@@ -17,6 +17,16 @@ This pipeline contains a set of functions designed to deconvolve cell type-speci
     - [map_cpgs](#map_cpgs)
     - [save_results](#save_results)
     - [main](#main1)
+- [02_check_genes.R](#script2)
+    - [load_pheno](#load_pheno2)
+    - [load_meth](#load_meth2)
+    - [count_regions](#count_regions)
+    - [correlate_gene_complexity](#correlated_gene_complexity)
+    - [get_global_pcs](#get_global_pcs)
+    - [correlated_global_local_pcs](#correlate_global_local_pcs)
+    - [check_global_pcs](#check_global_pcs)
+    - [check_pc_correlations](#check_pc_correlations)
+    - [main](#main2)
                                     
 
 ## Script 01                                    
@@ -436,7 +446,7 @@ The function returns `1` as a placeholder for successful execution and side-effe
 
 ---
 
-### <a name="main">`main`</a>
+### <a name="main2">`main`</a>
 
 #### Description
 
@@ -469,3 +479,394 @@ The function is used for its side effects and does not return any object; it out
 #### See Also
 
 - `readRDS`, `writeRDS`, `lapply`, `print`, `Sys.time`: Other functions and constructs used within `main`.
+
+___
+
+## <a name="script2">`02_check_genes.R`</a>
+
+
+### <a name="load_pheno2">`load_pheno`</a>
+
+#### Description
+
+The `load_pheno` function is designed to load and prepare phenotype data for subsequent analysis. It involves loading two primary types of data: clinical phenotype data and global principal components (PCs) associated with methylation data. The function then merges these datasets and formats the variables appropriately for analysis.
+
+#### Parameters
+
+- `svddir`: A string representing the directory path where the phenotype data and global methylation PCs are stored.
+- `cell_type`: A string specifying the cell type, used to identify the corresponding global methylation PCs file.
+
+#### Returns
+
+- `sub_pheno`: A data frame containing the merged and formatted phenotype data along with global methylation PCs. This data frame includes both numeric and categorical variables, with missing data in key variables (`age_death` and `sex`) filtered out.
+
+#### Detailed Functionality
+
+1. **Clinical Data Loading**: Reads the phenotype data (clinical data) from an RDS file specific to a cell type (e.g., astrocytes).
+
+2. **Global Methylation PCs Loading**: Reads the global principal components related to methylation, which are then merged with the clinical data based on `individualID`.
+
+3. **Data Preparation**:
+   - Selects relevant variables for analysis, including clinical scores, demographic data, and cell-type proportions.
+   - Converts the `Study` variable to a numeric factor to facilitate statistical analysis.
+   - Merges the global methylation PCs with the phenotype data.
+
+4. **Variable Transformation**:
+   - Converts numeric variables to characters and then to numerics to ensure correct data types.
+   - Transforms categorical variables to factors.
+   - Also creates factor versions of numeric variables for exploratory purposes.
+
+5. **Data Cleaning**: Filters out records with missing values in critical variables like `age_death` and `sex` to ensure data quality and integrity.
+
+#### Side Effects
+
+- Reads two RDS files from the specified directory.
+- Performs data transformation and cleaning operations.
+
+#### Files Used
+
+- Phenotype data file: `"[svddir]astro_formatted_clinical.rds"`
+- Global methylation PCs file: `"[svddir]cleaned_[cell_type]_global_pcs.rds"`
+
+---
+
+### <a name="load_meth2">`load_meth`</a>
+
+#### Description
+
+The `load_meth` function is designed to load methylation data and corresponding CpG maps for specific regions, summary types, and cell types. This function adapts to different types of methylation summaries (such as CpG-level data, averages, or principal components) and loads the appropriate data files. Additionally, it loads a CpG map that associates CpGs with genes.
+
+#### Parameters
+
+- `region_type`: A string indicating the region type of the methylation data (e.g., 'promoters', 'exons').
+- `summary_type`: A string specifying the type of summary for the methylation data, such as 'cpgs', 'avgs' (averages), or 'pcs' (principal components).
+- `cell_type`: A string identifying the cell type for which the methylation data is being loaded.
+
+#### Returns
+
+- A list containing two elements:
+    - `meth`: A data frame or matrix of methylation data corresponding to the specified summary type.
+    - `cpg_map`: A data frame mapping CpG sites to genes for the given region and cell type.
+
+#### Detailed Functionality
+
+1. **Data File Identification**: Based on the `summary_type` and `cell_type`, it constructs the file path to the appropriate methylation data file.
+
+2. **Methylation Data Loading**: Reads the methylation data (either CpG-level, averages, or PCs) from the constructed file path.
+
+3. **Data Cleaning and Formatting**:
+   - For averages (`summary_type == 'avgs'`), it removes any unnecessary columns like `duration_secs`.
+   - For principal components (`summary_type == 'pcs'`), it excludes columns that do not represent PCs, such as `percent_variance_explained`.
+
+4. **CpG Map Loading**: Loads a CpG map that connects CpG sites to genes, which is essential for understanding the genomic context of the methylation data.
+
+#### Side Effects
+
+- Reads one or two RDS files, depending on the `summary_type`.
+- Performs data selection and transformation operations based on the summary type.
+
+#### Files Used
+
+Depending on the `summary_type` and `cell_type`, it uses one of the following files:
+- For CpG-level data: `"[datadir]cleaned_[cell_type]_lifted_hg38_mvals.rds"`
+- For averages or PCs: `"[datadir]cleaned_[region_type]_[cell_type]_[summary_type].rds"`
+- CpG map file: `"[datadir][region_type]_[cell_type]_gene_cpg_map.rds"`
+
+---
+
+### <a name="count_regions">`count_regions`</a>
+
+#### Description
+
+The `count_regions` function is designed to analyze and summarize the distribution of CpGs and principal components (PCs) across different genomic regions and cell types. It processes each combination of region type and cell type, calculating various statistics such as the total number of genes, CpGs, PCs, and the variance explained by the PCs. This function provides a comprehensive overview of the methylation data's coverage and complexity across different regions and cell types.
+
+#### Parameters
+
+- `runs`: A data frame containing combinations of `region_type` and `cell_type` for which the function will perform the analysis. 
+
+#### Returns
+
+- `counts_df`: A data frame that aggregates all the computed statistics across different region and cell types. This data frame includes statistics like total genes, total CpGs, CpGs per gene, PCs per gene, and variance explained.
+
+#### Detailed Functionality
+
+1. **Data Preparation**: Expands the grid of `region_type` and `cell_type` combinations and iterates over each combination.
+
+2. **Data Loading**: For each combination, loads the methylation data (PCs) and the CpG map using the `load_meth` function.
+
+3. **Statistical Analysis**: Performs several statistical calculations:
+   - **CpG Stats**: Counts total genes, total CpGs, and calculates CpGs per gene.
+   - **PC Stats**: Determines the count of PCs per gene and overall PC statistics.
+   - **Variance Explained**: Loads the variance explained by each PC and calculates summary statistics.
+
+4. **Data Aggregation**: Combines all calculated statistics into a comprehensive data frame, adding `region_type` and `cell_type` for context.
+
+5. **Output Generation**: Saves the aggregated statistics as a CSV file.
+
+#### Side Effects
+
+- Reads multiple RDS files to load methylation data and CpG maps.
+- Writes a CSV file containing the aggregated statistics.
+
+#### Files Used
+
+- Methylation data files for each combination of region and cell type, following the pattern: `"[datadir]cleaned_[region_type]_[cell_type]_pcs.rds"`.
+
+#### Files Created
+
+- A CSV file summarizing the feature counts per gene across different regions and cell types: `"feature_per_gene_counts.csv"` in the specified `savedir`.
+
+---
+
+### <a name="correlate_gene_complexity">`correlate_gene_complexity`</a>
+
+#### Description
+
+The `correlate_gene_complexity` function investigates the relationship between gene complexity and the number of relevant principal components (PCs) in various genomic regions and cell types. This function explores the correlation between the count of CpGs and PCs per gene, as well as additional analyses involving the variation and length of genes. It offers insights into how gene complexity might be reflected in the methylation data's principal components.
+
+#### Parameters
+
+- `runs`: A data frame comprising combinations of `region_type` and `cell_type`. The function processes each combination to analyze gene complexity correlations.
+
+#### Returns
+
+- `res_df`: A data frame summarizing the correlation results, including statistics like the Pearson correlation coefficient and p-values for the correlation between CpGs and PCs, variation and PCs, and gene length and PCs.
+
+#### Detailed Functionality
+
+1. **Data Preparation**: Expands the grid of `region_type` and `cell_type` combinations and iterates over each combination.
+
+2. **Data Loading and Analysis**: For each combination, loads methylation data and CpG maps, calculates CpG counts, and counts PCs per gene. 
+
+3. **Correlation Analysis**: 
+   - Calculates the correlation between the number of CpGs and PCs per gene.
+   - Analyzes the variation within each gene's methylation values and correlates it with the number of PCs.
+   - Examines the gene length and its correlation with the number of PCs.
+
+4. **Additional Analysis**: 
+   - Computes the coefficient of variation for each gene.
+   - Aggregates and processes annotation data to calculate gene lengths.
+   - Correlates gene length with the number of PCs.
+
+5. **Result Compilation**: Aggregates all correlation statistics into a final data frame for each cell type and region type.
+
+6. **Output Generation**: Saves the correlation results and additional feature count data as CSV files.
+
+#### Side Effects
+
+- Reads multiple RDS files to load methylation data, CpG maps, and annotation data.
+- Writes CSV files containing correlation results and feature counts.
+- Generates plots to visualize the data.
+
+#### Files Used
+
+- Methylation data files and CpG maps for each combination of region and cell type.
+- Annotation data files for calculating gene lengths.
+
+#### Files Created
+
+- CSV files summarizing correlation results and feature counts: `"gene_complexity_correlations.csv"` and `"percent_variance_explained.csv"` in the specified `savedir`.
+- Plots for visualizing feature counts and percent variance explained.
+
+---
+
+### <a name="get_global_pcs">`get_global_pcs`</a>
+
+#### Description
+
+The `get_global_pcs` function retrieves the global principal components (PCs) for a specific cell type and region type. It's designed to load a pre-computed set of global principal components from a specified directory. These components are critical for understanding the overarching patterns and variations in the methylation data across different cell types and genomic regions.
+
+#### Parameters
+
+- `cell_type`: A string specifying the cell type for which the global PCs are to be loaded.
+- `region_type`: A string indicating the genomic region type associated with the global PCs.
+
+#### Returns
+
+- `global_pcs`: A data frame containing the global principal components for the specified cell type and region type, with the first row (usually headers or identifiers) removed for analysis purposes.
+
+#### Detailed Functionality
+
+1. **Data Location Identification**: Constructs the path to the RDS file where the global PCs for the given cell type and region type are stored.
+   
+2. **Data Loading**: Reads the RDS file containing the global PCs.
+
+3. **Data Formatting**: Returns the global PCs data frame, excluding the first row, which is commonly used for headers or identifiers.
+
+#### Side Effects
+
+- Reads an RDS file containing the global principal components for the specified cell type and region type.
+
+#### Files Used
+
+- An RDS file named after the pattern `"[svddir]/[cleaned_str]cleaned_[cell_type]_global_pcs.rds"` which contains the pre-computed global principal components.
+
+#### Example Usage
+
+This function can be used in a broader analysis pipeline where global patterns in methylation data across various cell types and genomic regions are being investigated. It allows for the easy retrieval of relevant principal components, facilitating subsequent analysis stages like correlation studies, variance explanation, or data visualization.
+
+---
+
+### <a name="correlate_global_local_pcs">`correlate_global_local_pcs`</a>
+
+#### Description
+
+This function correlates local principal components (PCs) with global PCs for a specific cell type and region type. It's designed to understand how local variations within specific gene regions or cell types align with broader, global patterns observed across the dataset. This analysis can reveal how localized methylation changes are reflective of or divergent from overall methylation patterns.
+
+#### Parameters
+
+- `meth`: A data frame or matrix of methylation data, typically containing local PCs.
+- `global_pcs`: A data frame of global principal components.
+- `cell_type`: A string specifying the cell type.
+- `region_type`: A string indicating the genomic region type.
+- `summary_type`: A string specifying the summary type of the methylation data (e.g., 'cpgs', 'avgs', 'pcs').
+
+#### Returns
+
+The function performs a correlation analysis and optionally generates visualizations. It does not return a specific value but may output plots to a designated directory.
+
+#### Detailed Functionality
+
+1. **Data Preparation and Ordering**: Aligns the ordering of samples in the local and global PC datasets to ensure consistency for correlation analysis.
+
+2. **Correlation Computation**: Calculates Pearson correlation coefficients between local and global PCs.
+
+3. **Data Formatting**: Formats the correlation data for further analysis and visualization.
+
+4. **Visualization**: Generates density plots to visually compare the distribution of maximum correlations and overall correlations between local and global PCs.
+
+#### Side Effects
+
+- Produces visualizations saved to a specified directory.
+- Prints messages to the console for diagnostic purposes.
+
+#### Files Used
+
+Files used by this function are generally passed as parameters (`meth` and `global_pcs`), derived from the parameters, or generated within the function.
+
+#### Example Usage
+
+This function is typically used in a methylation data analysis pipeline where understanding the relationship between local and global methylation patterns is crucial. It can help in identifying genes or regions where local methylation patterns are strongly aligned with or distinct from global patterns, which can be insightful in studies focusing on epigenetic regulation and its implications in various biological contexts.
+
+### <a name="check_global_pcs">`check_global_pcs`</a>
+
+#### Description
+
+The `check_global_pcs` function is designed to evaluate the correlation between local and global principal components in methylation data for a specified cell type and region type. This function is a wrapper that prepares the data for correlation analysis and then calls the `correlate_global_local_pcs` function to perform the actual correlation analysis.
+
+#### Parameters
+
+- `dat`: A list containing methylation data (`meth`) and CpG mapping information (`cpg_map`).
+- `cell_type`: A string specifying the cell type.
+- `region_type`: A string indicating the genomic region type.
+- `summary_type`: A string specifying the summary type of the methylation data (e.g., 'cpgs', 'avgs', 'pcs').
+
+#### Returns
+
+This function primarily orchestrates the correlation analysis and does not return a specific value but may output correlation results and plots.
+
+#### Detailed Functionality
+
+1. **Data Retrieval**: Extracts methylation data and CpG mapping information from the input list.
+
+2. **Global PC Retrieval**: Calls `get_global_pcs` to fetch the global principal components for the given cell and region type.
+
+3. **Correlation Analysis**: Invokes `correlate_global_local_pcs` to compute and analyze the correlations between local and global PCs.
+
+#### Side Effects
+
+- Generates correlation plots and potentially outputs diagnostic messages to the console.
+
+#### Files Used
+
+This function uses the data provided in its parameters (`dat`, `cell_type`, `region_type`, `summary_type`) and retrieves global PCs using the `get_global_pcs` function.
+
+#### Example Usage
+
+`check_global_pcs` is used in scenarios where researchers need to understand the relationship between localized and global patterns in methylation data. It is particularly useful in epigenetic studies focused on specific cell types or genomic regions, providing insights into how local changes correlate with more extensive methylation patterns.
+
+---
+
+### <a name="check_pc_correlations">`check_pc_correlations`</a>
+
+#### Description
+
+The `check_pc_correlations` function is designed to analyze the correlations between principal components (PCs) across different genes in methylation data. It aims to understand the relationship between variations in different genomic regions, specifically by examining how PCs associated with different genes correlate with each other, particularly across different chromosomes.
+
+#### Parameters
+
+- `meth`: A data frame or matrix containing methylation data.
+- `pcs_cpg`: A data frame mapping principal components (PCs) to CpG sites and genes.
+
+#### Returns
+
+The function primarily performs analysis and visualization of correlations between PCs. It does not return a specific value but may output correlation results and plots.
+
+#### Detailed Functionality
+
+1. **Chromosome Mapping**: Constructs a map from genes to chromosomes, associating each PC with a specific chromosome.
+
+2. **Correlation Analysis Across Chromosomes**: For a selected global PC, the function examines the correlations of PCs across different genes, focusing on gene pairs located on different chromosomes.
+
+3. **Data Subsetting and Preparation**: Subsets the methylation data for a sample of gene PCs and prepares phenotype data for partial correlation analysis.
+
+4. **Partial Correlation Computation**: Calculates partial correlations between pairs of PCs, controlling for other variables in the dataset.
+
+5. **Visualization**: Generates density plots to visualize the distribution of partial correlations.
+
+6. **Aggregation and Comparison**: Combines correlation data across multiple PCs and global PCs, facilitating a comprehensive comparison.
+
+#### Side Effects
+
+- Generates diagnostic messages and visualizations, which are saved to specified directories.
+- Reads and writes intermediate data files for efficient processing.
+
+#### Files Used
+
+Files used by this function are derived from the `meth` and `pcs_cpg` parameters or generated within the function.
+
+#### Example Usage
+
+This function is utilized in epigenetic studies where understanding the interconnectedness of genetic variations across different regions is crucial. By examining the correlations of PCs across genes, researchers can gain insights into the coordinated or independent patterns of methylation variations, which may be crucial for understanding complex genetic mechanisms or diseases.
+
+---
+
+### <a name="main2">`main`</a>
+
+#### Description
+
+The `main` function serves as the central execution point for analyzing methylation data across various cell types and gene regions. It orchestrates a series of data processing and analysis steps, including feature counting, complexity correlation, global-local PC correlation, and inter-PC correlation analysis.
+
+#### Detailed Functionality
+
+1. **Configuration Setup**: Defines the types of gene regions, summary types, and cell types to analyze. It then creates a grid of all possible combinations for these types.
+
+2. **Feature Counting**: For each combination in the grid, the function counts features (like CpGs and PCs) for each gene region using `count_regions`.
+
+3. **Gene Complexity Correlation**: Correlates gene complexity with rPCs (relative principal components) using `correlate_gene_complexity`.
+
+4. **Data Loading and Processing**: For each combination, loads the phenotype data using `load_pheno` and methylation data using `load_meth`. It checks global PCs and performs further processing specific to the region, summary, and cell types.
+
+5. **Global-Local PC Correlation Check**: Analyzes the correlation of local PCs with global PCs for a more comprehensive understanding of methylation patterns.
+
+6. **Inter-PC Correlation Analysis**: Examines correlations between PCs across different genes to understand the interconnectedness of genetic variations across various genomic regions.
+
+#### Returns
+
+- `res_df`: A data frame summarizing the results of the analysis for each combination of region type, summary type, and cell type.
+
+#### Side Effects
+
+- Produces extensive output including diagnostic messages, data frames, and potentially plots or files depending on the functions it calls.
+- Utilizes various functions that may read and write intermediate data files for processing.
+
+#### Example Usage
+
+This function is typically used in comprehensive epigenetic analysis workflows where a wide range of combinations of cell types, gene regions, and summary types need to be analyzed. By automating the process across all combinations, it provides a thorough understanding of the methylation landscape and its complexities.
+
+```R
+# Execute the main function to perform comprehensive analysis
+results_dataframe <- main()
+```
+
+This would generate a comprehensive analysis across specified cell types, gene regions, and summary types, giving insights into the methylation patterns and their implications in various biological contexts.
