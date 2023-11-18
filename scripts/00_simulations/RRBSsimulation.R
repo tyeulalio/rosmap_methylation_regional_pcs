@@ -7,10 +7,10 @@ library(RandomFields)
 ##average PMD = 0.10.  When DMRs are included, output is a list of length 2 with the DMR locations included in the second entry.
 ##sim.n3.d10.l250=sim.bed.vg(nsites=1000,nsamp=6,dm.len=250,prop.diff=0.10,pm.diff=0.10)
 
-nsites = 50
-nsamp = 8
-dm.len = 25
-prop.diff = 0.1
+nsites = 20
+nsamp = 50
+dm.len = 10
+prop.diff = 0
 pm.diff = 0.1
 sim.bed.vg=function(nsites=1000,nsamp=6,dm.len=2000,prop.diff=0,pm.diff=0.25)
 {
@@ -46,11 +46,16 @@ sim.bed.vg=function(nsites=1000,nsamp=6,dm.len=2000,prop.diff=0,pm.diff=0.25)
         dmsites=rep(0,nsites)
         diff.regs.samp=diff.regs[dm.rows,,drop=FALSE]
         diffdir=sample(c(1,-1),num.dm.regs,replace=T)
-        for(i in 1:num.dm.regs){
-            mprob.med=median(mprob[diff.regs.samp[i,1]:(diff.regs.samp[i,1]+diff.regs.samp[i,3]-1)])
-            if((mprob.med-pm.diff)<0){diffdir[i]= 1}
-            if((mprob.med+pm.diff)>1){diffdir[i]= -1}
-            dmsites[diff.regs.samp[i,1]:(diff.regs.samp[i,1]+diff.regs.samp[i,3]-1)]=diffdir[i]}
+        if (num.dm.regs >= 1){
+            for(i in 1:num.dm.regs){
+                print(diff.regs.samp)
+                mprob.med=median(mprob[diff.regs.samp[i,1]:(diff.regs.samp[i,1]+diff.regs.samp[i,3]-1)])
+                if((mprob.med-pm.diff)<0){diffdir[i]= 1}
+                if((mprob.med+pm.diff)>1){diffdir[i]= -1}
+                dmsites[diff.regs.samp[i,1]:(diff.regs.samp[i,1]+diff.regs.samp[i,3]-1)]=diffdir[i]}
+        } else{
+            mprob.med=0
+        }
     }
     cat("Done generating DM regions \n")
     

@@ -184,16 +184,26 @@ get_N_regions <- function(num_sites, num_samples, percent_meth_difference,
                                  function(x) {
                                      message(paste("Generating region", x))
                                      region_name <- paste0("region", x)
-                                     get_region(region_name,
+                                     res <- tryCatch({get_region(region_name,
                                                 num_sites, 
                                                 num_samples, 
                                                 dmr_length,
                                                 percent_meth_difference, 
                                                 percent_sites_dm)
-                                     }
-                                 )
-    summarized_regions[[1]]
-    
+                                            },
+                                            error = function(e){
+                                                print(paste("Error:", e))
+                                                return(list(avgs=NA, rpcs=NA, raw_data=NA))
+                                            }
+                                     )
+                                }
+                            )
+
+    if (all(is.na(summarized_regions))){
+        return(NA)
+    }
+    print(names(summarized_regions[[1]]))
+
     # create summary type data frames
     avgs <- lapply(summarized_regions, function(x) x$avgs) %>%
         do.call(rbind, .)
@@ -316,7 +326,7 @@ check_data <- function(){
         facet_wrap(control ~ dmsites, scales='free_y')
 }
 
-main <- function(){
+main <- function(runnum, N){
     # simulate the data
     # meth simulation parameters
     # num_sites = number of CpG sites to simulate in the region
@@ -327,14 +337,15 @@ main <- function(){
     # - this is not the same as # of differentially methylated CpGs
     # percent_sites_dm = percentages of CpGs that should be differentially
     # methylated
-    num_sites = 50
-    num_samples = 500
-    percent_meth_difference = 0.1
-    dmr_length = 25
-    percent_sites_dm = 0.1
+    #num_sites = 50
+    #num_samples = 500
+    #percent_meth_difference = 0.1
+    #dmr_length = 25
+    #percent_sites_dm = 0.1
+
     
     # number of regions simulate
-    N = 100
+    #N = 5
     
     # simulate and run DM analysis
     run_simulation <- function(num_sites, num_samples,
@@ -429,43 +440,88 @@ main <- function(){
     
     
     ## -- Example test for changing percent meth
-    (test_range <- seq(0.1, 1, 0.1))
-    res <- lapply(test_range, function(x) run_simulation(num_sites, num_samples,
-                                                   x,
-                                                   dmr_length, percent_sites_dm, N))
-    res_df <- do.call(rbind, res)
-    head(res_df)
+    #(test_range <- seq(0.1, 1, 0.1))
+    #res <- lapply(test_range, function(x) run_simulation(num_sites, num_samples,
+                                                   #x,
+                                                   #dmr_length, percent_sites_dm, N))
+    #res_df <- do.call(rbind, res)
+    #head(res_df)
     
     # just a quick view of the results
     # get long version
-    long_res <- res_df %>%
-        select(percent_meth_difference, bf_sig_avgs, bf_sig_rpcs) %>%
-        gather('sig_type', 'num_sig', bf_sig_avgs, bf_sig_rpcs) %>%
-        mutate(summary_type = str_remove(sig_type, "bf_sig_"))
-    head(long_res)
+    #long_res <- res_df %>%
+        #select(percent_meth_difference, bf_sig_avgs, bf_sig_rpcs) %>%
+        #gather('sig_type', 'num_sig', bf_sig_avgs, bf_sig_rpcs) %>%
+        #mutate(summary_type = str_remove(sig_type, "bf_sig_"))
+    #head(long_res)
     
-    ggplot(long_res) +
-        geom_point(aes(x=percent_meth_difference,
-                       y=num_sig,
-                       color=summary_type),
-                   size=2) +
-        theme_bw() +
-        theme(text=element_text(size=20)) +
-        xlab(paste("Percent methylation difference")) +
-        ylab(paste("Number of significant DM results")) +
-        guides(color=guide_legend(title="Summary type"))
+    #ggplot(long_res) +
+        #geom_point(aes(x=percent_meth_difference,
+                       #y=num_sig,
+                       #color=summary_type),
+                   #size=2) +
+        #theme_bw() +
+        #theme(text=element_text(size=20)) +
+        #xlab(paste("Percent methylation difference")) +
+        #ylab(paste("Number of significant DM results")) +
+        #guides(color=guide_legend(title="Summary type"))
         
+    num_sites_range <- c(20,50)
+    num_samples_range <- c(50,500,5000)
+    percent_meth_difference_range <- seq(0.1, 0.9, 0.1)
+    percent_sites_dm_range <- seq(0,1,0.25)
+
+    runs <- expand.grid(num_sites=num_sites_range,
+                        num_samples=num_samples_range,
+                        percent_meth_difference=percent_meth_difference_range,
+                        percent_sites_dm=percent_sites_dm_range
+    ) %>%
+        mutate(run=row_number())
+    dim(runs)
+    head(runs)
+
+    
+    process_run <- function(run){
+        num_sites <- run[['num_sites']] %>% as.numeric()
+        num_samples <- run[['num_samples']] %>% as.numeric()
+        percent_meth_difference <- run[['percent_meth_difference']] %>% as.numeric()
+        percent_sites_dm <- run[['percent_sites_dm']] %>% as.numeric()
+
+        dmr_length <- num_sites / 2
+
+        print(paste("Processing run", run[['run']], "out of", nrow(runs)))
+        print(paste("Parameters:", "numsite:", num_sites, 
+                    "numsamples:", num_samples,
+                    "percent_meth_difference:", percent_meth_difference,
+                    "percent_sites_dm:", percent_sites_dm,
+                    "dmrlength:", dmr_length,
+                    "N:", N))
+        
+        res <- run_simulation(num_sites, num_samples, percent_meth_difference, dmr_length, percent_sites_dm, N)
+        return(1)
+    }
+
+    #res <- apply(runs, 1, process_run)
+    process_run(runs[runnum,])
+    return(1)
 }
 
-main()
 
+# get command line arguments and run main
+args = commandArgs(trailingOnly=TRUE)
+if (length(args)==0) {
+    stop("At least one argument must be supplied (input file).n", call.=FALSE)
+} 
+# run number
+runnum = args[1]
 
+# number of regions simulate
+N = 100
 
+start <- Sys.time()
+main(runnum, N)
+end <- Sys.time()
 
-
-
-
-
-
-
-
+print(paste("start time:", start))
+print(paste("end time:", end))
+print(paste("duration:", end-start))
