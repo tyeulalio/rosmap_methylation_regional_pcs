@@ -12,7 +12,7 @@ library(tidyverse)
 ## First source both the "RRBSsimulation.R" and "RRBSmodeling.R" scripts and make sure that all required libraries are installed
 ## Install the appropriate packages, some are out of date, you may get
 ## warning messages about invalid components but the code will still run
-#setwd("D:/OneDrive/MontgomeryLab/deconvolution/RRBS-sim/")
+# setwd("D:/montgomery_lab/deconvolution_project/rosmap_methylation_regional_pcs/scripts/00_simulations/")
 source("RRBSsimulation.R")
 source("RRBSmodeling.R")
 
@@ -94,7 +94,7 @@ summarize_region <- function(processed_meth, region_name){
     head(rpcs)
     dim(rpcs)
     
-    summarized_region <- list(avgs=avgs, rpcs=rpcs)
+    summarized_region <- list(avgs=avgs, rpcs=rpcs, full_rpcs=pc_res)
     summarized_region
 }
 
@@ -218,6 +218,9 @@ get_N_regions <- function(num_sites, num_samples, percent_meth_difference,
     raw_data <- lapply(summarized_regions, function(x) x$raw_data)
     head(raw_data[[1]])
     
+    rpcs_full <- lapply(summarized_regions, function(x) x$full_rpcs)
+    head(rpcs_full[[1]])
+    
     # store the parameters
     parameters <- list(num_sites=num_sites, 
                        num_samples=num_samples,
@@ -229,6 +232,7 @@ get_N_regions <- function(num_sites, num_samples, percent_meth_difference,
     # combine the results and parameters together
     simulated_dat <- list(avgs=avgs, rpcs=rpcs,
                           raw_data=raw_data,
+                          full_rpcs=full_rpcs,
                           parameters=parameters)
     simulated_dat
 }
@@ -337,15 +341,15 @@ main <- function(runnum, N){
     # - this is not the same as # of differentially methylated CpGs
     # percent_sites_dm = percentages of CpGs that should be differentially
     # methylated
-    #num_sites = 50
-    #num_samples = 500
-    #percent_meth_difference = 0.1
-    #dmr_length = 25
-    #percent_sites_dm = 0.1
+    # num_sites = 50
+    # num_samples = 500
+    # percent_meth_difference = 0.1
+    # dmr_length = 25
+    # percent_sites_dm = 0.1
 
     
     # number of regions simulate
-    #N = 5
+    # N = 5
     
     # simulate and run DM analysis
     run_simulation <- function(num_sites, num_samples,
