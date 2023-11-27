@@ -232,7 +232,7 @@ get_N_regions <- function(num_sites, num_samples, percent_meth_difference,
     # combine the results and parameters together
     simulated_dat <- list(avgs=avgs, rpcs=rpcs,
                           raw_data=raw_data,
-                          full_rpcs=full_rpcs,
+                          rpcs_full=rpcs_full,
                           parameters=parameters)
     simulated_dat
 }
@@ -407,6 +407,18 @@ main <- function(runnum, N){
         
         avgs_res <- run_dmp(avgs, pheno)
         rpcs_res <- run_dmp(rpcs, pheno)
+
+
+        dm_res <- list(avgs_res, rpcs_res)
+        (filename <- paste0("DM_results_",
+                            "_numSites", num_sites,
+                            "_numSamples", num_samples,
+                            "_pct_meth_diff", percent_meth_difference,
+                            "_dmr_length", dmr_length,
+                            "_pct_sites_dm", percent_sites_dm,
+                            "_N", N))
+        (savefile <- paste0(savedir, filename, ".rds"))
+        saveRDS(dm_res, savefile)
         
         # compare methods
         head(avgs_res)
@@ -520,7 +532,7 @@ if (length(args)==0) {
 runnum = args[1]
 
 # number of regions simulate
-N = 100
+N = 1000
 
 start <- Sys.time()
 main(runnum, N)
