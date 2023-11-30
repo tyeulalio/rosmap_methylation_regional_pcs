@@ -1,6 +1,5 @@
 # Run differential methylation analysis on the simulated regions
 
-#library(regionalpcs)
 library(RNOmni)
 library(ggplot2)
 library(limma)
@@ -11,7 +10,7 @@ library(tidyverse)
 savedir <- paste0("../../output/01_dmp_results/")
 dir.create(savedir)
 
-datadir <- paste0("simulated_data/")
+datadir <- paste0("../../output/00_simulated_data/")
 
 
 
@@ -88,6 +87,7 @@ main <- function(runnum, N){
         percent_sites_dm <- run[['percent_sites_dm']] %>% as.numeric()
 
         dmr_length <- num_sites / 2
+        N <- 1000
 
         print(paste("Processing run", run[['run']], "out of", nrow(runs)))
         print(paste("Parameters:", "numsite:", num_sites, 
@@ -116,7 +116,7 @@ main <- function(runnum, N){
             return(1)
         }
         
-        head(results)
+        #head(results)
 
         # grab the averages and rpcs
         avgs <- results$avgs
@@ -140,7 +140,7 @@ main <- function(runnum, N){
         # compare methods
         head(avgs_res)
         
-        dm_res <- avgs_res
+        #dm_res <- avgs_res
         sig_thresh <- 0.05
         get_sig_counts <- function(dm_res){
             bf_sig <- sum(dm_res$bf_pval < sig_thresh)
@@ -152,7 +152,9 @@ main <- function(runnum, N){
         }
         avgs_sig <- get_sig_counts(avgs_res$results)
         rpcs_sig <- get_sig_counts(rpcs_res$results)
-        
+
+
+        # store the number of sig results for avgs and rpcs
         num_sig <- tibble(num_sites=num_sites,
                num_samples=num_samples,
                percent_meth_difference=percent_meth_difference,
@@ -170,6 +172,12 @@ main <- function(runnum, N){
                uc_sig_avgs=avgs_sig$uc_sig,
                uc_sig_rpcs=rpcs_sig$uc_sig)
         dm_res$num_sig <- num_sig
+
+        names(dm_res)
+        test <- dm_res$num_sig
+        class(test)
+        names(test)
+        head(test)
 
         (filename <- paste0("DM_results",
                             "_numSites", num_sites,
