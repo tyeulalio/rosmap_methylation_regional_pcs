@@ -27,6 +27,8 @@
     - [Normalization Procedure](#normalization-procedure)
     - [Statistical Analysis](#statistical-analysis)
     - [Differential Methylation Output Files](#differential-methylation-output-files)
+        - [Accessing the DM Data](#accessing-the-dm-data)
+        - [Extracting the DM Data](#extracting-the-dm-data)
         - [Storing Results](#storing-results)
         - [Accessing and Understanding the Results Files](#accessing-and-understanding-the-results-files)
         - [Contents of the Differential Methylation Results List Object](#contents-of-the-differential-methylation-results-list-object)
@@ -242,10 +244,10 @@ Your section detailing the output files for differential methylation and how to 
 
 ## Differential Methylation Output Files
 
-### Accessing the Data
+### Accessing the DM Data
 The output for the differential methylation analysis can be found on Google Drive. Access can be requested at the following link: [Google Drive Folder](https://drive.google.com/drive/u/0/folders/19hGbVr4HpASlUPAXpjQJ1N4rXHy8VG-k).
 
-### Extracting the Data
+### Extracting the DM Data
 The data is compressed in a tar.gz format. To extract the files, use the following command in the terminal:
 
 ```bash
