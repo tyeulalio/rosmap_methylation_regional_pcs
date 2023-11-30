@@ -242,6 +242,18 @@ Your section detailing the output files for differential methylation and how to 
 
 ## Differential Methylation Output Files
 
+### Accessing the Data
+The output for the differential methylation analysis can be found on Google Drive. Access can be requested at the following link: [Google Drive Folder](https://drive.google.com/drive/u/0/folders/19hGbVr4HpASlUPAXpjQJ1N4rXHy8VG-k).
+
+### Extracting the Data
+The data is compressed in a tar.gz format. To extract the files, use the following command in the terminal:
+
+```bash
+tar -zxf file.tar.gz --directory /path/to/directory
+```
+
+For more information on extracting files, visit [CyberCiti: How to extract tar files to a specific directory](https://www.cyberciti.biz/faq/howto-extract-tar-file-to-specific-directory-on-unixlinux/).
+
 ### Storing Results
 
 The differential methylation analysis for each combination of simulation parameters results in the generation of output files for N=1000 simulated gene regions. These output files follow a specific naming convention and are stored in a designated directory. The naming convention for the output files is as follows:
