@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 #SBATCH --job-name=sim
-#SBATCH --output=./sbatch_output/array_%a.out
-#SBATCH --error=./sbatch_output/array_%a.err
-#SBATCH --array=6-270
+#SBATCH --output=../../output/00_sbatch_output/array_%a.out
+#SBATCH --error=../../output/00_sbatch_output/array_%a.err
+#SBATCH --array=1-120
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --mem=128G

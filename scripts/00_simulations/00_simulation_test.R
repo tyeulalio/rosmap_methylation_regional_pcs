@@ -17,7 +17,7 @@ source("RRBSsimulation.R")
 source("RRBSmodeling.R")
 
 # create a directory to save the data
-savedir <- paste0("simulated_data/")
+savedir <- paste0("../../output/00_simulated_data/")
 dir.create(savedir)
 
 
@@ -237,48 +237,6 @@ get_N_regions <- function(num_sites, num_samples, percent_meth_difference,
     simulated_dat
 }
 
-#meth <- avgs # for testing
-run_dmp <- function(meth, pheno){
-    # run the dmp analysis
-    head(meth) 
-    head(pheno)
-    
-    stopifnot(colnames(meth) == pheno$samples)
-    
-    # set up the model + design matrix
-    model_content <- paste0("~ status")
-    design <- model.matrix(as.formula(model_content), data=pheno)
-    
-    # run linear model
-    lmfit <- lmFit(meth, design)
-    
-    # ebayes shrinkage
-    lm <- eBayes(lmfit)
-    
-    # grab results
-    head(lm)
-    results <- topTable(lm, 
-                        coef='status',
-                        number = Inf,
-                        adjust.method='none')
-    head(results)
-    
-    # add p-value adjustment here
-    results <- results %>%
-        mutate(bh_pval = p.adjust(P.Value, method='BH'),
-               bf_pval = p.adjust(P.Value, method='bonferroni'))
-    head(results)
-    
-    # how many are significant?
-    num_sig <- nrow(results[results$bh_pval < 0.05,])
-    print(paste("Number of BH sig results:", num_sig))
-    
-    num_sig <- nrow(results[results$bf_pval < 0.05,])
-    print(paste("Number of BF sig results:", num_sig))
-    
-    return(results)
-}
-
 ## -- checking on simulated data
 check_data <- function(){
     simulated_meth <- simulated_dat$raw_data[[1]][[1]]
@@ -387,105 +345,20 @@ main <- function(runnum, N){
             (savefile <- paste0(savedir, filename, ".rds"))
             saveRDS(simulated_dat, savefile)
         }
-        
-        
-        # grab normalized methylation data
-        rpcs <- simulated_dat$rpcs
-        avgs <- simulated_dat$avgs
-        
-        print(paste("number of rpcs:", nrow(rpcs)))
-        print(paste("number of avgs:", nrow(avgs)))
-        
-        # check if we can detect differential methylation
-        # maybe do this as a block of about 15k simulated regions
-        # like standard DM analysis? Apply multiple test correction too.
-        # make a phenotype dataframe
-        pheno <- data.frame(samples=colnames(avgs)) %>%
-            mutate(status=str_remove(samples, "_[0-9]*")) %>%
-            mutate(status=as.numeric(as.factor(status)))
-        head(pheno)
-        
-        avgs_res <- run_dmp(avgs, pheno)
-        rpcs_res <- run_dmp(rpcs, pheno)
-
-
-        dm_res <- list(avgs_res, rpcs_res)
-        (filename <- paste0("DM_results_",
-                            "_numSites", num_sites,
-                            "_numSamples", num_samples,
-                            "_pct_meth_diff", percent_meth_difference,
-                            "_dmr_length", dmr_length,
-                            "_pct_sites_dm", percent_sites_dm,
-                            "_N", N))
-        (savefile <- paste0(savedir, filename, ".rds"))
-        saveRDS(dm_res, savefile)
-        
-        # compare methods
-        head(avgs_res)
-        
-        dm_res <- avgs_res
-        sig_thresh <- 0.05
-        get_sig_counts <- function(dm_res){
-            bf_sig <- sum(dm_res$bf_pval < sig_thresh)
-            bh_sig <- sum(dm_res$bh_pval < sig_thresh)
-            uc_sig <- sum(dm_res$P.Value < sig_thresh)
-            list(bf_sig=bf_sig,
-                 bh_sig=bh_sig,
-                 uc_sig=uc_sig)
-        }
-        avgs_sig <- get_sig_counts(avgs_res)
-        rpcs_sig <- get_sig_counts(rpcs_res)
-        
-        tibble(num_sites=num_sites,
-               num_samples=num_samples,
-               percent_meth_difference=percent_meth_difference,
-               dmr_length=dmr_length,
-               percent_sites_dm=percent_sites_dm,
-               N=N,
-               num_rpcs=nrow(rpcs),
-               
-               bf_sig_avgs=avgs_sig$bf_sig,
-               bf_sig_rpcs=rpcs_sig$bf_sig,
-               
-               bh_sig_avgs=avgs_sig$bh_sig,
-               bh_sig_rpcs=rpcs_sig$bh_sig,
-               
-               uc_sig_avgs=avgs_sig$uc_sig,
-               uc_sig_rpcs=rpcs_sig$uc_sig)
     }
-    
-    
-    ## -- Example test for changing percent meth
-    #(test_range <- seq(0.1, 1, 0.1))
-    #res <- lapply(test_range, function(x) run_simulation(num_sites, num_samples,
-                                                   #x,
-                                                   #dmr_length, percent_sites_dm, N))
-    #res_df <- do.call(rbind, res)
-    #head(res_df)
-    
-    # just a quick view of the results
-    # get long version
-    #long_res <- res_df %>%
-        #select(percent_meth_difference, bf_sig_avgs, bf_sig_rpcs) %>%
-        #gather('sig_type', 'num_sig', bf_sig_avgs, bf_sig_rpcs) %>%
-        #mutate(summary_type = str_remove(sig_type, "bf_sig_"))
-    #head(long_res)
-    
-    #ggplot(long_res) +
-        #geom_point(aes(x=percent_meth_difference,
-                       #y=num_sig,
-                       #color=summary_type),
-                   #size=2) +
-        #theme_bw() +
-        #theme(text=element_text(size=20)) +
-        #xlab(paste("Percent methylation difference")) +
-        #ylab(paste("Number of significant DM results")) +
-        #guides(color=guide_legend(title="Summary type"))
         
+        
+    # parameter ranges that are being tested
+    #num_sites_range <- c(20,50)
+    #num_samples_range <- c(50,500,5000)
+    #percent_sites_dm_range <- seq(0,0.75,0.25)
+    #percent_meth_difference_range <- seq(0.1, 0.9, 0.1)
+
+    # paramters to test on second run
     num_sites_range <- c(20,50)
-    num_samples_range <- c(50,500,5000)
-    percent_meth_difference_range <- seq(0.1, 0.9, 0.1)
-    percent_sites_dm_range <- seq(0,1,0.25)
+    num_samples_range <- c(50,500)
+    percent_sites_dm_range <- seq(0,0.75,0.25)
+    percent_meth_difference_range <- seq(0.01, 0.2, 0.02)
 
     runs <- expand.grid(num_sites=num_sites_range,
                         num_samples=num_samples_range,
@@ -516,6 +389,7 @@ main <- function(runnum, N){
         res <- run_simulation(num_sites, num_samples, percent_meth_difference, dmr_length, percent_sites_dm, N)
         return(1)
     }
+
 
     #res <- apply(runs, 1, process_run)
     process_run(runs[runnum,])
