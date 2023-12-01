@@ -84,6 +84,8 @@ percent_sites_dm = 0.1
 ```
 
 ## Range of Tested Parameters
+
+### Round 1
 The following ranges of values were tested for the parameters:
 
 ```plaintext
@@ -91,6 +93,21 @@ num_sites_range <- c(20, 50)
 num_samples_range <- c(50, 500, 5000)
 percent_meth_difference_range <- seq(0.1, 0.9, 0.1)
 percent_sites_dm_range <- seq(0, 1, 0.25)
+```
+
+### Round 2
+A second round was performed to test more values of smaller percent methylation differences. We removed some of the other parameters that we were no longer interested in testing due to small effects. 
+- removed `num_samples` 5000 because results are very stable and both summaries consistently perform well
+- removed `percent_sites_dm` 1 because it caused the simulation to create odd regions with very little DMRs
+- Expanded the tests of `percent_meth_difference` between 0.1 and 0.2. We noted large changes in this region of small differences and wanted to explore these further.
+
+The new ranges of values tested for this round:
+
+```plaintext
+num_sites_range <- c(20, 50)
+num_samples_range <- c(50, 500)
+percent_meth_difference_range <- seq(0.1, 0.2, 0.01)
+percent_sites_dm_range <- seq(0, 0.75, 0.25)
 ```
 
 ## Fixed or Dependent Parameters
