@@ -358,7 +358,8 @@ main <- function(runnum, N){
     num_sites_range <- c(20,50)
     num_samples_range <- c(50,500)
     percent_sites_dm_range <- seq(0,0.75,0.25)
-    percent_meth_difference_range <- seq(0.01, 0.2, 0.02)
+    percent_meth_difference_range <- seq(0.01, 0.2, 0.01)
+    dmr_length_range = c(250, 2000)
 
     runs <- expand.grid(num_sites=num_sites_range,
                         num_samples=num_samples_range,
@@ -376,7 +377,7 @@ main <- function(runnum, N){
         percent_meth_difference <- run[['percent_meth_difference']] %>% as.numeric()
         percent_sites_dm <- run[['percent_sites_dm']] %>% as.numeric()
 
-        dmr_length <- num_sites / 2
+        #dmr_length <- num_sites / 10
 
         print(paste("Processing run", run[['run']], "out of", nrow(runs)))
         print(paste("Parameters:", "numsite:", num_sites, 
