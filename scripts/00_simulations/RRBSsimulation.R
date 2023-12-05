@@ -8,10 +8,10 @@ library(RandomFields)
 ##sim.n3.d10.l250=sim.bed.vg(nsites=1000,nsamp=6,dm.len=250,prop.diff=0.10,pm.diff=0.10)
 
 nsites = 20
-nsamp = 50
-dm.len = 10
-prop.diff = 0
-pm.diff = 0.1
+nsamp = 500
+dm.len = 25
+prop.diff = 0.2
+pm.diff = 0
 sim.bed.vg=function(nsites=1000,nsamp=6,dm.len=2000,prop.diff=0,pm.diff=0.25)
 {
     lagvec=lag.sim.hmm(len=(nsites-1))
@@ -25,9 +25,10 @@ sim.bed.vg=function(nsites=1000,nsamp=6,dm.len=2000,prop.diff=0,pm.diff=0.25)
     scorepos=as.numeric(as.factor(rank((floor(chrpos/50)),ties.method="average")))
     scoretab=as.data.frame(matrix(0,length(chrpos),nsamp))
     for(i in 1:nscores){
-    if(i%%1000==0){cat("Working on score ", i, "\n")}
-    for(j in 1:nsamp){
-    scoretab[scorepos==i,j]=scoremat[i,j]}}
+        if(i%%1000==0){cat("Working on score ", i, "\n")}
+        for(j in 1:nsamp){
+            scoretab[scorepos==i,j]=scoremat[i,j]}
+        }
     names(scoretab)[1:nsamp]=paste("SC",1:nsamp,sep=".")
     cat("Done generating score matrix \n")
     
@@ -36,17 +37,18 @@ sim.bed.vg=function(nsites=1000,nsamp=6,dm.len=2000,prop.diff=0,pm.diff=0.25)
     mprob=sim.corr.pm(samp.pos=chrpos)
     dmsites=rep(0,nsites)
     if(prop.diff>0){
-        diff.regs=dm.regs(chrpos, dm.len=dm.len, min.sites=dm.len/50)
+        diff.regs=dm.regs(chrpos, dm.len=dm.len, min.sites=dm.len*0.02) # needed to update this because math was wrong to compute 2% of dm.len (it was dm.len/50 which only works for default length)
         avg.nsites.dm=mean(diff.regs[,3])
         num.dm.regs=nsites*prop.diff/avg.nsites.dm
         if(num.dm.regs<nrow(diff.regs)){
-            dm.rows=sample(1:nrow(diff.regs),num.dm.regs)}
-        else{dm.rows=1:nrow(diff.regs)
+            dm.rows=sample(1:nrow(diff.regs),num.dm.regs)
+            }else{dm.rows=1:nrow(diff.regs)
             num.dm.regs=nrow(diff.regs)}
         dmsites=rep(0,nsites)
         diff.regs.samp=diff.regs[dm.rows,,drop=FALSE]
         diffdir=sample(c(1,-1),num.dm.regs,replace=T)
         if (num.dm.regs >= 1){
+            i=1
             for(i in 1:num.dm.regs){
                 print(diff.regs.samp)
                 mprob.med=median(mprob[diff.regs.samp[i,1]:(diff.regs.samp[i,1]+diff.regs.samp[i,3]-1)])
@@ -65,16 +67,17 @@ sim.bed.vg=function(nsites=1000,nsamp=6,dm.len=2000,prop.diff=0,pm.diff=0.25)
     mprob.diff[mprob.diff >1]=0.99
     pmtab=as.data.frame(matrix(0,length(chrpos),nsamp))
     for(j in 1:(nsamp/2))
-    {pmtab[,j]=round(rbinom(nsites,size=scoretab[,j],prob=mprob)*(100/scoretab[,j]))}
+        {pmtab[,j]=round(rbinom(nsites,size=scoretab[,j],prob=mprob)*(100/scoretab[,j]))}
     for(j in (nsamp/2+1):nsamp)
-    {pmtab[,j]=round(rbinom(nsites,size=scoretab[,j],prob=mprob.diff)*(100/scoretab[,j]))}
+        {pmtab[,j]=round(rbinom(nsites,size=scoretab[,j],prob=mprob.diff)*(100/scoretab[,j]))}
     names(pmtab)[1:nsamp]=paste("PM",1:nsamp,sep=".")
     cat("Done generating PM matrix \n")
     
     
     restab=cbind(chrpos,dmsites,mprob,mprob.diff, scoretab,pmtab)
+    sum(dmsites != 0)
     if(prop.diff>0){
-    return(list(restab,diff.regs.samp[order(diff.regs.samp[,1]),]))}
+        return(list(restab,diff.regs.samp[order(diff.regs.samp[,1]),]))}
     else{return(restab)}
 }
 
@@ -89,33 +92,33 @@ lag.hmm.pars$pm$sdlog=c(0.90,2.84)
 ##Subroutine to generate CpG site locations
 lag.sim.hmm=function(len=1000,hmm.pars=lag.hmm.pars)
 {
-dx=dthmm(NULL,Pi=hmm.pars$Pi,delta=hmm.pars$delta,distn="lnorm",pm=hmm.pars$pm)
-sim.hmm=simulate(dx,nsim=len)
-lagvec=round(sim.hmm$x)
-hv=which(log(lagvec)>15)
-lagvec[hv]=lagvec[hv]/10
-lv=which(lagvec<2)
-lagvec[lv]=rep(2,length(lv))
-return(lagvec)
+    dx=dthmm(NULL,Pi=hmm.pars$Pi,delta=hmm.pars$delta,distn="lnorm",pm=hmm.pars$pm)
+    sim.hmm=simulate(dx,nsim=len)
+    lagvec=round(sim.hmm$x)
+    hv=which(log(lagvec)>15)
+    lagvec[hv]=lagvec[hv]/10
+    lv=which(lagvec<2)
+    lagvec[lv]=rep(2,length(lv))
+    return(lagvec)
 }
 
 ##Subroutine to generate coverage scores using normal copula
 score.sim.mix=function(len=500,param=c(0.34,1.62,1.03,13.08,3.70),nsamp=2,cor=c(0.8))
 {
-stype=rep(0,len)
-ntype1=round(len*param[1])
-dtype=sample(1:len,ntype1)
-stype[dtype]=1
-mv1<- mvdc(normalCopula(param=cor,dim=nsamp, dispstr="un"), margins="gamma",
-              paramMargins=list(list(shape=param[2],rate=param[3])) ,marginsIdentical=TRUE)
-mv2<- mvdc(normalCopula(param=cor,dim=nsamp, dispstr="un"), margins="gamma",
-              paramMargins=list(list(shape=param[4],rate=param[5])) ,marginsIdentical=TRUE)
-mvsamp1 <- rMvdc(ntype1, mv1)
-mvsamp2 <- rMvdc(len-ntype1,mv2)
-mvsamp=matrix(0,len,nsamp)
-mvsamp[stype==1,]=round(exp(mvsamp1))
-mvsamp[stype==0,]=round(exp(mvsamp2))
-return(mvsamp)
+    stype=rep(0,len)
+    ntype1=round(len*param[1])
+    dtype=sample(1:len,ntype1)
+    stype[dtype]=1
+    mv1<- mvdc(normalCopula(param=cor,dim=nsamp, dispstr="un"), margins="gamma",
+                  paramMargins=list(list(shape=param[2],rate=param[3])) ,marginsIdentical=TRUE)
+    mv2<- mvdc(normalCopula(param=cor,dim=nsamp, dispstr="un"), margins="gamma",
+                  paramMargins=list(list(shape=param[4],rate=param[5])) ,marginsIdentical=TRUE)
+    mvsamp1 <- rMvdc(ntype1, mv1)
+    mvsamp2 <- rMvdc(len-ntype1,mv2)
+    mvsamp=matrix(0,len,nsamp)
+    mvsamp[stype==1,]=round(exp(mvsamp1))
+    mvsamp[stype==0,]=round(exp(mvsamp2))
+    return(mvsamp)
 }
 
 
@@ -125,49 +128,53 @@ covmodel=RMplus(RMgauss(var=0.151,scale=1594.341),RMnugget(var=0.014),RMtrend(me
 ##Subroutine to generate locally correlated PM levels
 sim.corr.pm=function(samp.pos,shape1=0.14, shape2=0.18)
 {
-sim.len=length(samp.pos)
-pm.ind=rbeta(sim.len,shape1,shape2)
-pm.ind[pm.ind<1e-15]=1e-15
-pm.ind[pm.ind>1-(1e-15)]=1-(1e-15)
-pm.corr=0
-pos.vec=samp.pos
-pos.breaks=c(0,which(diff(pos.vec)>5000),length(pos.vec))
-for(i in 1:(length(pos.breaks)-1))
-{
-pm.curr=pm.ind[(pos.breaks[i]+1):(pos.breaks[i+1])]
-#cat("pm.curr = \n")
-#print(pm.curr)
-pos.curr=pos.vec[(pos.breaks[i]+1):(pos.breaks[i+1])]
-covmat.curr=as.matrix(RFcovmatrix(x=pos.curr,model=covmodel))
-#cat("covmat.curr = \n")
-#print(covmat.curr)
-corrmat.curr=cov2cor(covmat.curr)
-chol.curr=t(chol(corrmat.curr))
-pm.trans=1-pnorm(chol.curr%*%qnorm(1-pm.curr))
-pm.corr[(pos.breaks[i]+1):(pos.breaks[i+1])]=pm.trans
-}
-return(pm.corr)
+    sim.len=length(samp.pos)
+    pm.ind=rbeta(sim.len,shape1,shape2)
+    pm.ind[pm.ind<1e-15]=1e-15
+    pm.ind[pm.ind>1-(1e-15)]=1-(1e-15)
+    pm.corr=0
+    pos.vec=samp.pos
+    pos.breaks=c(0,which(diff(pos.vec)>5000),length(pos.vec))
+    for(i in 1:(length(pos.breaks)-1))
+    {
+        pm.curr=pm.ind[(pos.breaks[i]+1):(pos.breaks[i+1])]
+        #cat("pm.curr = \n")
+        #print(pm.curr)
+        pos.curr=pos.vec[(pos.breaks[i]+1):(pos.breaks[i+1])]
+        covmat.curr=as.matrix(RFcovmatrix(x=pos.curr,model=covmodel))
+        #cat("covmat.curr = \n")
+        #print(covmat.curr)
+        corrmat.curr=cov2cor(covmat.curr)
+        chol.curr=t(chol(corrmat.curr))
+        pm.trans=1-pnorm(chol.curr%*%qnorm(1-pm.curr))
+        pm.corr[(pos.breaks[i]+1):(pos.breaks[i+1])]=pm.trans
+    }
+    return(pm.corr)
 }
 
-
+# diff.regs=dm.regs(chrpos, dm.len=dm.len, min.sites=dm.len/50) # from main code
+# min.sites=dm.len*0.02
+# dm.len
+# x=chrpos
 ##Subroutine to identify potential locations for DMRs
 dm.regs=function(x=chrpos,dm.len=2000,min.sites=5){
-nsites=length(x)
-dmstarts=dmlen=sitenum=0
-siteend=-1
-for(i in 1:(nsites-1)){
-if(i>(siteend+1) & (x[i+1]-x[i]) <dm.len){
-curr.int=paste("[",x[i], ",",x[i]+dm.len-1,"]")
-curr.sites=which(x %in% interval(curr.int))
-curr.len=length(curr.sites)
-if(curr.len >= min.sites){
-dmstarts=c(dmstarts,x[i])
-sitenum=c(sitenum,i)
-dmlen=c(dmlen,curr.len)
-siteend=i+curr.len-1
-}
-}
-}
-return(cbind(sitenum[-1],dmstarts[-1],dmlen[-1]))
+    nsites=length(x)
+    dmstarts=dmlen=sitenum=0
+    siteend=-1
+    i=1
+    for(i in 1:(nsites-1)){
+        if(i>(siteend+1) & (x[i+1]-x[i]) <dm.len){
+            curr.int=paste("[",x[i], ",",x[i]+dm.len-1,"]")
+            curr.sites=which(x %in% interval(curr.int))
+            curr.len=length(curr.sites)
+                if(curr.len >= min.sites){
+                    dmstarts=c(dmstarts,x[i])
+                    sitenum=c(sitenum,i)
+                    dmlen=c(dmlen,curr.len)
+                    siteend=i+curr.len-1
+                }
+        }
+    }
+    return(cbind(sitenum[-1],dmstarts[-1],dmlen[-1]))
 }
 
