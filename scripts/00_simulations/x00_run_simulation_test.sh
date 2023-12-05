@@ -3,7 +3,7 @@
 #SBATCH --job-name=sim
 #SBATCH --output=../../output/00_sbatch_output/array_%a.out
 #SBATCH --error=../../output/00_sbatch_output/array_%a.err
-#SBATCH --array=1-120
+#SBATCH --array=1-320
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --mem=128G
