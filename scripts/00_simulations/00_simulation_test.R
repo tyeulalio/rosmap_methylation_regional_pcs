@@ -12,7 +12,7 @@ library(tidyverse)
 ## First source both the "RRBSsimulation.R" and "RRBSmodeling.R" scripts and make sure that all required libraries are installed
 ## Install the appropriate packages, some are out of date, you may get
 ## warning messages about invalid components but the code will still run
-# setwd("D:/montgomery_lab/deconvolution_project/rosmap_methylation_regional_pcs/scripts/00_simulations/")
+setwd("D:/montgomery_lab/deconvolution_project/rosmap_methylation_regional_pcs/scripts/00_simulations/")
 source("RRBSsimulation.R")
 source("RRBSmodeling.R")
 
@@ -21,15 +21,14 @@ savedir <- paste0("../../output/00_simulated_data/")
 dir.create(savedir)
 
 
-
 simulate_region <- function(num_sites, num_samples, dmr_length,
                           percent_meth_difference, percent_sites_dm){
     # simulate a single gene's methylation
     region_sim <- sim.bed.vg(nsites=num_sites,
                nsamp=num_samples,
                dm.len=dmr_length,
-               prop.diff=percent_meth_difference,
-               pm.diff=percent_sites_dm)
+               prop.diff=percent_sites_dm,
+               pm.diff=percent_meth_difference)
     region_sim
     
     return(region_sim)
@@ -121,7 +120,7 @@ get_region <- function(region_name, num_sites, num_samples, dmr_length,
     head(simulated_meth)
     
     # tells you direction of DM difference for controls vs cases
-    # table(simulated_meth$dmsites)
+    table(simulated_meth$dmsites)
     
     
     # get long form of meth data
@@ -299,11 +298,11 @@ main <- function(runnum, N){
     # - this is not the same as # of differentially methylated CpGs
     # percent_sites_dm = percentages of CpGs that should be differentially
     # methylated
-    # num_sites = 50
-    # num_samples = 500
-    # percent_meth_difference = 0.1
-    # dmr_length = 25
-    # percent_sites_dm = 0.1
+    num_sites = 50
+    num_samples = 500
+    percent_meth_difference = 10
+    dmr_length = 25
+    percent_sites_dm = 0.1
 
     
     # number of regions simulate
