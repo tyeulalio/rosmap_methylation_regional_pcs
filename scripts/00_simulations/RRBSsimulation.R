@@ -7,11 +7,11 @@ library(RandomFields)
 ##average PMD = 0.10.  When DMRs are included, output is a list of length 2 with the DMR locations included in the second entry.
 ##sim.n3.d10.l250=sim.bed.vg(nsites=1000,nsamp=6,dm.len=250,prop.diff=0.10,pm.diff=0.10)
 
-nsites = 20
+nsites = 50
 nsamp = 500
 dm.len = 25
-prop.diff = 0.2
-pm.diff = 0
+prop.diff = 0.1
+pm.diff = 0.1
 sim.bed.vg=function(nsites=1000,nsamp=6,dm.len=2000,prop.diff=0,pm.diff=0.25)
 {
     lagvec=lag.sim.hmm(len=(nsites-1))

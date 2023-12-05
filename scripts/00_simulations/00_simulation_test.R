@@ -298,11 +298,11 @@ main <- function(runnum, N){
     # - this is not the same as # of differentially methylated CpGs
     # percent_sites_dm = percentages of CpGs that should be differentially
     # methylated
-    num_sites = 50
-    num_samples = 500
-    percent_meth_difference = 10
-    dmr_length = 25
-    percent_sites_dm = 0.1
+    # num_sites = 50
+    # num_samples = 500
+    # percent_meth_difference = 0.1
+    # dmr_length = 25
+    # percent_sites_dm = 0.1
 
     
     # number of regions simulate
