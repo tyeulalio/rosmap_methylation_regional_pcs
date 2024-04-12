@@ -39,21 +39,8 @@ dir.create(savedir, showWarnings=FALSE)
 # include global pcs as covariates or not?
 include_global = TRUE
 protect_global = TRUE
-if (include_global){
-    savedir <- paste0(savedir, "global_pcs/")
-    dir.create(savedir)
-
-    if (protect_global){
-        savedir <- paste0(savedir, "protect_global_pcs/")
-        dir.create(savedir)
-    } else{
-        savedir <- paste0(savedir, "remove_all_global_pcs/")
-        dir.create(savedir)
-    }
-
-}
-
 cleaned_mvals = TRUE
+
 if (cleaned_mvals){
     cleaned_str = "cleaned_"
 } else{
@@ -65,32 +52,27 @@ if (clean_global){
 }
 
 test_bulk = FALSE
-if (test_bulk){
-    savedir <- paste0(savedir, "test_bulk/")
-    dir.create(savedir)
-}
-
-datadir
-savedir
 
 
+# function to load phenotype data
 load_pheno <- function(cell_type){
-    # load the phenotype data   
     # can use any cell type since they're all the same 
     datafile <- paste0(svddir, "astro_formatted_clinical.rds")
     pheno <- readRDS(datafile)
     head(pheno)
 
-    # set up variables 
+    # select and transorm relevant variables
+    # new_diag = is binary variable
+    # new apoe looks for 34 genotype
     sub_pheno <- pheno %>%
         select(individualID, braaksc, ceradsc, cogdx, dcfdx_lv, diagnosis, apoe4, apoe_genotype, bin_apoe4,
                age_death, pmi, sex, batch=meth.batch, study=Study,
                neuron, oligo_opc, astro, endo, new_apoe, new_diag
         ) %>%
         mutate(new_diag = ifelse(new_diag == 'Control', NA, new_diag),
-                new_diag = as.numeric(new_diag == 'AD')
-        ) %>%
-        mutate(new_apoe = as.numeric(new_apoe == 34)) 
+                new_diag = as.numeric(new_diag == 'AD'),
+                new_apoe = as.numeric(new_apoe == 34)
+                )
     head(sub_pheno)
 
 
@@ -123,155 +105,7 @@ load_pheno <- function(cell_type){
     sub_pheno
 }
 
-
-run_dmp <- function(meth, pheno, global_pcs, region_type, summary_type, cleaned_str, trait, cell_type, shuffle_pheno, shuffle_num){
-    # run the dmp analysis
-
-    # attach global pcs to ordered pheno
-    head(global_pcs)
-    pc_cols = colnames(global_pcs)
-    pc_cols
-
-    formatted_pcs <- global_pcs %>%
-        as.data.frame() %>%
-        rownames_to_column('individualID')
-    head(formatted_pcs)
-
-    # make sure pheno and meth are in the same order
-    head(pheno)
-    ordered_pheno <- pheno %>%
-        rownames_to_column('rowname') %>%
-        left_join(formatted_pcs) %>%
-        column_to_rownames('individualID') 
-    head(ordered_pheno)
-    dim(ordered_pheno)
-
-
-    # create a trait column
-    trait
-    ordered_pheno['trait'] <- ordered_pheno[trait] 
-    head(ordered_pheno)
-
-    # order the date to connect them
-    ordered_pheno <- ordered_pheno %>%
-        filter(!is.na(trait)) 
-    dim(ordered_pheno)
-
-    ordered_samples <- intersect(rownames(ordered_pheno), colnames(meth))
-    head(ordered_samples)
-
-    # move gene id to rownames
-    # and normalize
-    head(meth)
-    ordered_meth <- meth[,ordered_samples] %>%
-        na.omit() %>%
-        apply(1,RankNorm) %>%
-        t() %>%
-        as.data.frame()
-    head(ordered_meth)
-
-    ordered_pheno <- ordered_pheno[ordered_samples,]
-
-    dim(ordered_meth)
-    dim(ordered_pheno)
-
-    # check to make sure they're ordered identically
-    if(!identical(colnames(ordered_meth), rownames(ordered_pheno))){
-      stop("ERROR: colnames mvals don't match targets")
-    }
-
-        
-    # ---- DMP Analysis with limma ----
-    # create model
-
-    head(ordered_pheno)
-
-    # replace missing pmi with mean
-    ordered_pheno <- ordered_pheno %>%
-        mutate(pmi = ifelse(is.na(pmi), mean(pmi, na.rm=TRUE), pmi)) %>%
-        mutate(age_death = ifelse(is.na(age_death), mean(age_death, na.rm=TRUE), age_death)) 
-
-        
-
-
-    # set up the model
-    model_content <-  paste0("~ trait + age_death + sex + pmi + batch + study")
-
-    # include global pcs or not?
-    if (include_global){
-        model_content <-  paste0(paste(c(model_content, pc_cols), collapse=' + '))
-    } 
-
-    # add cell type proportions
-    model_content <- paste0(paste(c(model_content, c("neuron", "endo", "astro")), collapse=" + "))
-    model_content
-
-    if (test_bulk){
-        model_content <- paste0(c("neuron", "oligo_opc", "endo", "astro", "age_death + sex + pmi + batch + study", pc_cols), collapse=" + ")
-        model_content <- paste0("~ ", model_content)
-    }
-    model_content
-
-    print(model_content)
-
-
-    # design model 
-    design <- model.matrix(as.formula(model_content), data = ordered_pheno)
-
-    head(design)
-    dim(ordered_meth)
-    dim(design)
-        
-    # run linear model
-    lmfit <- lmFit(ordered_meth, design)
-
-    # remove number of unprotected svs from degrees of freedom in lmfit
-    # do not need to
-    #remove <- 0
-    #lmfit$df.residual <- lmfit$df.residual - remove
-    
-    # use empirical bayes to stabilize estimates
-    lm <- eBayes(lmfit)
-        
-    # get number of probes that are significant with FDR <0.05
-    if (!test_bulk){
-        head(lm)
-        results <- topTable(
-          lm,
-          coef = 'trait', 
-          number = Inf,
-          adjust.method = 'none'
-        )
-        head(results)
-    }
-
-    res <- lapply(c('neuron', 'oligo_opc', 'endo', 'astro'), get_res)
-    results <- do.call(rbind, res)
-    head(results)
-
-    # add p-value adjustment here
-    results <- results %>%
-        mutate(bh_pval = p.adjust(P.Value, method='BH'),
-               bf_pval = p.adjust(P.Value, method='bonferroni')
-        )
-        
-    # filter results
-    results_sub <- results[results$bh_pval < 0.05, ]
-
-    dim(results)
-    dim(results_sub)
-
-    print(paste("Number of sig results:", nrow(results_sub), "out of", nrow(results)))
-
-    # save the filtered results
-    filename <- paste(trait, cell_type, region_type, summary_type, "filtered_limma_results.rds", sep='_')
-    savefile <- paste0(savedir, cleaned_str, filename)
-    savefile
-    saveRDS(results_sub, savefile)
-
-    1
-}
-
+# function to load the methylation data
 load_meth <- function(region_type, summary_type, cleaned_str, cell_type){
     # load the methylation data
 
@@ -313,6 +147,225 @@ load_meth <- function(region_type, summary_type, cleaned_str, cell_type){
     }
 
     meth
+}
+
+# function to match cpgs to region
+match_cpgs_to_regions <- function(meth, region_type, cell_type){
+    # load cpg-gene map for region
+    datafile <- paste0(datadir, "/", region_type, "_", cell_type, "_gene_cpg_map.rds")
+    cpg_map <- readRDS(datafile)
+    head(cpg_map)
+
+    # get cpg positions and id
+    datafile <- paste0(datadir,
+                       cell_type, "_cpg_position_map.rds")
+    pos_map <- readRDS(datafile) %>%
+        rename(cpg_id = cpg)
+    head(pos_map)
+
+    # combine annots
+    ext_map <- cpg_map %>%
+        left_join(pos_map)
+    head(ext_map)
+
+    head(meth)
+
+    keep_probes <- intersect(rownames(meth), ext_map$cpg_id)
+    length(keep_probes)
+
+    sub_meth <- meth[keep_probes,]
+    dim(meth)
+    dim(sub_meth)
+
+    meth <- sub_meth
+    meth
+}
+
+# function to get the global methylation pcs
+get_global_pcs <- function(cell_type, include_global){ 
+    if (!include_global) return(NULL)
+
+    # select the appropriate global pcs
+    if (cell_type != 'bulk'){
+        pcs_file <- paste0(svddir, cleaned_str, "cleaned_", cell_type, "_global_pcs.rds")
+    } else{
+        pcs_file <- paste0(svddir, "cleaned_bulk_global_pcs.rds")
+    }
+    pcs_file
+
+    # read in the global pcs that were computed in the 
+    # 02_batch_correction script in the 02_deconvolution directory
+    pcs <- readRDS(pcs_file)
+    pcs <- pcs[-1,]
+    head(pcs)
+
+    if (protect_global){
+        # do not include PCs if they have no significant correlation with
+        # the outcome trait, batch, pmi, and study
+        print(paste("Protecting global PCs"))
+
+         #filter pcs to only those that we want to remove
+         #load lm pvals for global PCs
+        savefile <- paste0(svddir, cleaned_str, "cleaned_", cell_type, "_pc_lm_pvals.rds")
+        lm_pval <- readRDS(savefile)
+        head(lm_pval)
+
+        # find the pcs to protect
+        # protect pcs with trait correlation pval < threshold,
+        # and pval > threshold for batch, pmi, and study variables
+        thresh <- 0.1
+        protect_pcs <- lm_pval %>%
+            select(-pct_var, -pval) %>%
+            spread(trait, bf_pval)
+
+        protect_pcs['trait'] <- protect_pcs[trait]
+        protect_pcs <- protect_pcs %>%
+            select(pc, trait, meth.batch, pmi, Study) %>%
+            filter(
+                   trait < thresh,
+                   meth.batch >= thresh,
+                   pmi >= thresh,
+                   Study >= thresh
+            ) %>%
+            mutate(pc = str_replace(pc, 'pc_', 'PC'))
+        head(protect_pcs)
+
+        # these pcs should be removed from covariates
+        head(pcs)
+        remove_pcs <- setdiff(colnames(pcs), protect_pcs$pc)
+        remove_pcs
+
+        global_pcs <- pcs[,remove_pcs] 
+    } else{
+        print(paste("NOT protecting global PCs"))
+        global_pcs <- pcs
+    } 
+    return(global_pcs)
+}
+
+# function to run the main dmp analysis
+run_dmp <- function(meth, pheno, global_pcs, region_type, summary_type, cleaned_str, trait, cell_type, shuffle_pheno, shuffle_num){
+    # run the dmp analysis
+
+    # attach global pcs to ordered phenotype data
+    head(global_pcs)
+    pc_cols = colnames(global_pcs)
+    pc_cols
+
+    formatted_pcs <- global_pcs %>%
+        as.data.frame() %>%
+        rownames_to_column('individualID')
+    head(formatted_pcs)
+
+    # make sure pheno and meth are in the same order
+    # so we can connect the data frames for testing
+    head(pheno)
+    ordered_pheno <- pheno %>%
+        rownames_to_column('rowname') %>%
+        left_join(formatted_pcs) %>%
+        column_to_rownames('individualID') 
+    head(ordered_pheno)
+    dim(ordered_pheno)
+
+
+    # create a trait column
+    trait
+    ordered_pheno['trait'] <- ordered_pheno[trait] 
+    head(ordered_pheno)
+
+    # order the data to connect them
+    ordered_pheno <- ordered_pheno %>%
+        filter(!is.na(trait)) 
+    dim(ordered_pheno)
+
+    ordered_samples <- intersect(rownames(ordered_pheno), colnames(meth))
+    head(ordered_samples)
+
+    # move gene id to rownames
+    # and normalize
+    head(meth)
+    ordered_meth <- meth[,ordered_samples] %>%
+        na.omit() %>%
+        apply(1,RankNorm) %>%
+        t() %>%
+        as.data.frame()
+    head(ordered_meth)
+
+    ordered_pheno <- ordered_pheno[ordered_samples,]
+
+    dim(ordered_meth)
+    dim(ordered_pheno)
+
+    # check to make sure they're ordered identically
+    if(!identical(colnames(ordered_meth), rownames(ordered_pheno))){
+      stop("ERROR: colnames mvals don't match targets")
+    }
+
+    # replace missing pmi with mean
+    ordered_pheno <- ordered_pheno %>%
+        mutate(pmi = ifelse(is.na(pmi), mean(pmi, na.rm=TRUE), pmi)) %>%
+        mutate(age_death = ifelse(is.na(age_death), mean(age_death, na.rm=TRUE), age_death)) 
+
+        
+    # ---- DMP Analysis with limma ----
+    # set up the model
+    model_content <-  paste0("~ trait + age_death + sex + pmi + batch + study")
+
+    # include global pcs or not?
+    if (include_global){
+        model_content <-  paste0(paste(c(model_content, pc_cols), collapse=' + '))
+    } 
+
+    # add cell type proportions
+    model_content <- paste0(paste(c(model_content, c("neuron", "endo", "astro")), collapse=" + "))
+
+    print(model_content)
+
+
+    # design model 
+    design <- model.matrix(as.formula(model_content), data = ordered_pheno)
+
+    # run linear model
+    lmfit <- lmFit(ordered_meth, design)
+
+    # remove number of unprotected svs from degrees of freedom in lmfit
+    # do not need to
+    #remove <- 0
+    #lmfit$df.residual <- lmfit$df.residual - remove
+    
+    # use empirical bayes to stabilize estimates
+    lm <- eBayes(lmfit)
+        
+    # get number of probes that are significant with FDR <0.05
+    results <- topTable(
+      lm,
+      coef = 'trait', 
+      number = Inf,
+      adjust.method = 'none'
+    )
+
+
+    # add p-value adjustment here
+    results <- results %>%
+        mutate(bh_pval = p.adjust(P.Value, method='BH'),
+               bf_pval = p.adjust(P.Value, method='bonferroni')
+        )
+        
+    # filter results
+    results_sub <- results[results$bh_pval < 0.05, ]
+
+    dim(results)
+    dim(results_sub)
+
+    print(paste("Number of sig results:", nrow(results_sub), "out of", nrow(results)))
+
+    # save the filtered results
+    filename <- paste(trait, cell_type, region_type, summary_type, "filtered_limma_results.rds", sep='_')
+    savefile <- paste0(savedir, cleaned_str, filename)
+    savefile
+    saveRDS(results_sub, savefile)
+
+    1
 }
 
 check_results <- function(){
@@ -396,6 +449,7 @@ check_results <- function(){
 
         print(paste("Processing", cell_type, region_type, trait, cleaned_str, Sys.time()))
 
+        # read the cpg data 
         filename <- paste(trait, cell_type, region_type, summary_type, "unfiltered_limma_results.rds", sep='_')
         datafile <- paste0(savedir, cleaned_str, filename)
         datafile
@@ -435,8 +489,6 @@ check_results <- function(){
                    cell_type=cell_type
             ) %>%
             separate(gene_id, c('gene_id', 'enhancer_type'), sep='-', fill='right') 
-            #separate(gene_id, c('gene_id', 'vers'), sep='\\.') %>%
-            #left_join(gene_map)
         head(formatted_cpg)
 
 
@@ -450,78 +502,240 @@ check_results <- function(){
 
     cpg_res <- apply(runs, 1, map_cpgs)
 
+    1
+}
 
-    ## -- map full array results to region types
-    runs
-    region_type <- region_types[4]
-    row <- runs[1,]
-    map_full_array_cpgs <- function(row){
-        summary_type <- summary_types[3]
+# function to plot the dmp results
+plot_results <- function(){
+    # create plots to visualize the results
+    summary_types <- c('avgs', 'pcs', 'cpgs')
+    region_types <- c('full_gene', 'preTSS', 'gene_body', 'promoters')
+    cell_types <- c('astro', 'endo', 'neuron', 'oligo_opc', 'bulk')
+    traits <- c('ceradsc', 'cat_braaksc', 'new_apoe', 'new_diag')
+
+    runs <- expand.grid(summary_type=summary_types,
+                        region_type=region_types,
+                        cell_type=cell_types,
+                        trait=traits
+    )
+    head(runs)
+    dim(runs)
+
+    full_array = FALSE # dont use the full array, only use cpgs that overlap with gene regions
+
+    # load gene symbol file
+    datafile <- paste0("/path/to/table/full_biomart_table.csv")
+    gene_symbols <- read_csv(datafile) %>%
+        separate(Ensembl_ID, c('ensembl_gene_id', 'ensembl_gene_id_version'), sep="\\.")
+    head(gene_symbols)
+
+    # load niagds genes
+    datafile <- paste0("/path/to/genes/NIAGDS_AD_genes_list.csv")
+    niagds_genes <- read_csv(datafile, col_name='Symbol')
+    head(niagds_genes)
+
+    # load the dmp results
+    row <- runs[1,] # for testing interactively
+    load_summary <- function(row, full_array){
+        # get parameters for this run
+        summary_type <- row[['summary_type']]
         region_type <- row[['region_type']]
-        trait <- row[['trait']]
-        cleaned_str <- row[['cleaned_str']]
         cell_type <- row[['cell_type']]
+        trait <- row[['trait']]
 
-        print(paste("Processing", cell_type, region_type, trait, cleaned_str, Sys.time()))
+        # get the datafile
+        datafile <- paste(trait, cell_type, region_type, summary_type, 
+                          "unfiltered_limma_results.rds", sep='_'
+        )
+        if (summary_type == 'cpgs'){
+            datafile <- paste(trait, cell_type, region_type, summary_type, 
+                              "mapped_unfiltered_limma_results.rds", sep='_'
+                              )
+        }
+        if (summary_type == 'cpgs' & full_array){
+            datafile <- paste(trait, cell_type, region_type, summary_type, 
+                              "mapped_full_array_unfiltered_limma_results.rds", sep='_'
+                              )
+        }
 
-        # read in the full array results
-        filename <- paste(trait, cell_type, "full_array", summary_type, "unfiltered_limma_results.rds", sep='_')
-        datafile <- paste0(savedir, cleaned_str, filename)
-        datafile
-        cpg_res <- readRDS(datafile)
-        head(cpg_res)
+        # load the data
+        datapath <- paste0(savedir, cleaned_str, datafile)
+        datapath
+        list.files(savedir)
 
-        # need to get the cpg position annotations
-        mapdir <- paste0("../../output/03_summarised_genes/01_summarised_genes/restimate_proportions/", cov_str, "/")
-        mapfile <- paste0(mapdir, region_type, "_", cell_type, "_gene_cpg_map.rds")
-        cpg_map <- readRDS(mapfile)
-        head(cpg_map)
+        if (!file.exists(datapath)){
+            print(paste("No datafile for", summary_type, region_type, cell_type, trait))
+            return(NA)
+        }
 
-        # need a cpgs position map
-        datafile <- paste0(mapdir, cell_type, "_cpg_position_map.rds")
-        datafile
-        cpg_position_map <- readRDS(datafile)
-        head(cpg_position_map)
-
-        full_map <- cpg_position_map %>%
-            select(probe=group_name, cpg_id=cpg) %>%
-            left_join(cpg_map) %>%
-            filter(!is.na(gene_id))
-        head(full_map)
-
-        
-        # find out which genes these cpgs map to
-        head(cpg_res)
-        dim(cpg_res)
-        formatted_cpg <- cpg_res %>%
-            rownames_to_column('cpg_id') %>%
-            left_join(full_map) %>%
-            #filter(!is.na(gene_id)) %>%
-            mutate(trait=trait,
-                   region_type=region_type,
-                   summary_type=summary_type,
-                   cleaned_str=cleaned_str,
-                   cell_type=cell_type
-            ) %>%
-            separate(gene_id, c('gene_id', 'enhancer_type'), sep='-') %>%
-            #separate(gene_id, c('gene_id', 'vers'), sep='\\.') %>%
-            left_join(gene_map)
-        head(formatted_cpg)
+        dmp <- readRDS(datapath)
+        head(dmp)
 
 
-        savefile <- paste(trait, cell_type, region_type, summary_type, "full_array_mapped_unfiltered_limma_results.rds", sep='_')
-        savepath <- paste0(savedir, cleaned_str, savefile)
-        savepath
-        saveRDS(formatted_cpg, savepath)
+        # format the feature column to match across summary types
+        if (summary_type == 'cpgs'){
+            dmp <- dmp %>%
+                mutate(feature = paste0(gene_id, "-", cpg_id))
+        } else{
+            dmp <- dmp %>%
+                rownames_to_column('feature')
+        }
+        head(dmp)
 
+
+        # select columns that we care about
+        sub_dmp <- dmp %>%
+            select(feature, logFC, AveExpr, t, P.Value, bh_pval, bf_pval, B) %>%
+            mutate(summary_type = summary_type,
+                   region_type = region_type,
+                   cell_type = cell_type,
+                   full_array=full_array,
+                   trait=trait
+            )
+        head(sub_dmp)
+
+        # make the results nicer
+        nice_df <- sub_dmp %>%
+            separate(feature, c('gene_id', 'feature_id'), sep='-', fill='right') %>%
+            separate(gene_id, c('ensembl_gene_id', 'gene_version'), remove=FALSE, sep="\\.") %>%
+            left_join(gene_symbols) %>%
+            select(-gene_id) %>%
+            rename(gene_id = ensembl_gene_id) %>%
+            select(-gene_version, -ensembl_gene_id_version, -full_array) %>%
+            select(summary_type:Symbol, feature_id, everything()) %>%
+            mutate(niagds_gene = Symbol %in% niagds_genes$Symbol)
+        head(nice_df)
+
+        nice_df
+    }
+    
+    # get the results for the matched cpgs
+    dmp_res <- apply(runs, 1, load_summary, full_array=FALSE)
+    dmp_df <- do.call(rbind, dmp_res)
+    head(dmp_df)
+
+
+    # get the results for the full array cpgs
+    unique(dmp_df$summary_type)
+    unique(dmp_df$region_type)
+
+    # save the full results
+    save_nice_results <- function(region_type){
+        runs <- expand.grid(summary_type=summary_types,
+                            region_type=region_type,
+                            cell_type=cell_types,
+                            trait=traits
+        )
+
+        print(head(runs))
+
+        # get the results for the matched cpgs
+        dmp_res <- apply(runs, 1, load_summary, full_array=FALSE)
+        dmp_df <- do.call(rbind, dmp_res)
+        head(dmp_df)
+
+        # write the full table of results
+        (savefile <- paste0(savedir, region_type, "_full_DM_results.csv"))
+        write_csv(dmp_df, savefile)
+
+
+        # get significant counts
+        head(dmp_df)
+        sig_df <- dmp_df %>%
+            filter(bh_pval < 0.05)
+        head(sig_df)
+
+        sig_counts <- sig_df %>%
+            rowwise() %>%
+            mutate(gene_feature = paste(gene_id, feature_id, sep='-')) %>%
+            group_by(summary_type, region_type, cell_type) %>%
+            summarize(sig_genes = n_distinct(gene_id),
+                      sig_features = n_distinct(gene_feature)
+            )
+        head(sig_counts)
+
+        # get total counts too
+        total_counts <- dmp_df %>%
+            rowwise() %>%
+            mutate(gene_feature = paste(gene_id, feature_id, sep='-')) %>%
+            group_by(summary_type, region_type, cell_type) %>%
+            summarize(total_genes = n_distinct(gene_id),
+                      total_features = n_distinct(gene_feature)
+            )
+        head(total_counts)
+
+        # join the sig and total counts together
+        all_counts <- total_counts %>%
+            left_join(sig_counts) %>%
+            mutate(sig_genes = ifelse(is.na(sig_genes), 0, sig_genes)) %>%
+            mutate(sig_features = ifelse(is.na(sig_features), 0, sig_features)) 
+        head(all_counts)
+
+        (savefile <- paste0(savedir, region_type, "_all_counts.csv"))
+        write_csv(all_counts, savefile)
         1
     }
-
-    # do not need to run
-    #cpg_res <- apply(runs, 1, map_full_array_cpgs)
+    lapply(region_types, save_nice_results)
 
 
-    1
+    # load files from here to combine together
+    (savefiles <- paste0(savedir, region_types, "_all_counts.csv"))
+    combined_counts <- lapply(savefiles, read_csv) %>%
+        do.call(rbind, .)
+    head(combined_counts)
+    dim(combined_counts)
+
+    (savefile <- paste0(savedir, "combined_regions_all_counts.csv"))
+    write_csv(combined_counts, savefile)
+
+    
+    # combine the two results
+    combined_df <- dmp_df %>%
+        left_join(summary_type_map) %>%
+        left_join(cell_type_map) %>%
+        left_join(region_type_map)
+    head(combined_df)
+    dim(combined_df)
+
+    (savefile <- paste0(savedir, "combined_dm_results.rds"))
+    saveRDS(combined_df, savefile)
+
+    # types of pvalue adjustment performed
+    # plot results for both
+    correction_types <- c('bh', 'bf')
+
+    plotting_dir <- paste0(savedir, "plots/")
+    dir.create(plotting_dir, showWarnings=FALSE)
+
+    # plot the counts of sig dmps
+    correction_type <- correction_types[1]
+    plot_dmp_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE)
+    plot_dmp_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE)
+
+    correction_type <- correction_types[2]
+    plot_dmp_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE)
+    plot_dmp_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE)
+
+    
+    # plot the counts of sig genes
+    correction_type <- correction_types[1]
+    plot_gene_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE)
+    plot_gene_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE)
+
+    correction_type <- correction_types[2]
+    plot_gene_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE)
+    plot_gene_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE)
+
+
+    # check pcs
+    correction_type <- correction_types[1]
+    check_pcs(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE)
+
+    # plot manhattan plot
+    correction_type <- correction_types[1]
+    plot_manhattan(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE)
+
+    head(combined_df)
 }
 
 match_cpgs <- function(meth, region_type, cleaned_str, cell_type){
@@ -4236,254 +4450,10 @@ plot_manhattan <- function(combined_df, correction_type, summary_type_colors, pl
 }
 
 
-plot_results <- function(){
-    # create plots to visualize the results
-    summary_types <- c('avgs', 'pcs', 'cpgs')
-    region_types <- c('full_gene', 'preTSS', 'gene_body', 'promoters')
-    cell_types <- c('astro', 'endo', 'neuron', 'oligo_opc', 'bulk')
-    traits <- c('ceradsc', 'cat_braaksc', 'new_apoe', 'new_diag')
-
-    runs <- expand.grid(summary_type=summary_types,
-                        region_type=region_types,
-                        cell_type=cell_types,
-                        trait=traits
-    )
-    head(runs)
-    dim(runs)
-
-    full_array = FALSE
-
-    # load gene symbol file
-    datafile <- paste0("/path/to/table/full_biomart_table.csv")
-    gene_symbols <- read_csv(datafile) %>%
-        separate(Ensembl_ID, c('ensembl_gene_id', 'ensembl_gene_id_version'), sep="\\.")
-    head(gene_symbols)
-
-    # load niagds genes
-    datafile <- paste0("/path/to/genes/NIAGDS_AD_genes_list.csv")
-    niagds_genes <- read_csv(datafile, col_name='Symbol')
-    head(niagds_genes)
-
-    # load the dmp results
-    row <- runs[1,] # for testing interactively
-    load_summary <- function(row, full_array){
-        # get parameters for this run
-        summary_type <- row[['summary_type']]
-        region_type <- row[['region_type']]
-        cell_type <- row[['cell_type']]
-        trait <- row[['trait']]
-
-        # get the datafile
-        datafile <- paste(trait, cell_type, region_type, summary_type, 
-                          "unfiltered_limma_results.rds", sep='_'
-        )
-        if (summary_type == 'cpgs'){
-            datafile <- paste(trait, cell_type, region_type, summary_type, 
-                              "mapped_unfiltered_limma_results.rds", sep='_'
-                              )
-        }
-        if (summary_type == 'cpgs' & full_array){
-            datafile <- paste(trait, cell_type, region_type, summary_type, 
-                              "mapped_full_array_unfiltered_limma_results.rds", sep='_'
-                              )
-        }
-
-        # load the data
-        datapath <- paste0(savedir, cleaned_str, datafile)
-        datapath
-        list.files(savedir)
-
-        if (!file.exists(datapath)){
-            print(paste("No datafile for", summary_type, region_type, cell_type, trait))
-            return(NA)
-        }
-
-        dmp <- readRDS(datapath)
-        head(dmp)
 
 
-        # format the feature column to match across summary types
-        if (summary_type == 'cpgs'){
-            dmp <- dmp %>%
-                mutate(feature = paste0(gene_id, "-", cpg_id))
-        } else{
-            dmp <- dmp %>%
-                rownames_to_column('feature')
-        }
-        head(dmp)
 
-
-        # select columns that we care about
-        sub_dmp <- dmp %>%
-            select(feature, logFC, AveExpr, t, P.Value, bh_pval, bf_pval, B) %>%
-            mutate(summary_type = summary_type,
-                   region_type = region_type,
-                   cell_type = cell_type,
-                   full_array=full_array,
-                   trait=trait
-            )
-        head(sub_dmp)
-
-        if (test_bulk){
-            sub_dmp <- dmp %>%
-                select(feature, logFC, AveExpr, t, P.Value, bh_pval, bf_pval, B, outcome_celltype=cell_type) %>%
-                mutate(summary_type = summary_type,
-                       region_type = region_type,
-                       cell_type = cell_type,
-                       full_array=full_array,
-                       trait=trait
-                )
-
-        }
-        head(sub_dmp)
-
-        # make the results nicer
-        nice_df <- sub_dmp %>%
-            separate(feature, c('gene_id', 'feature_id'), sep='-', fill='right') %>%
-            separate(gene_id, c('ensembl_gene_id', 'gene_version'), remove=FALSE, sep="\\.") %>%
-            left_join(gene_symbols) %>%
-            select(-gene_id) %>%
-            rename(gene_id = ensembl_gene_id) %>%
-            select(-gene_version, -ensembl_gene_id_version, -full_array) %>%
-            select(summary_type:Symbol, feature_id, everything()) %>%
-            mutate(niagds_gene = Symbol %in% niagds_genes$Symbol)
-        head(nice_df)
-
-        nice_df
-    }
-    
-    # get the results for the matched cpgs
-    dmp_res <- apply(runs, 1, load_summary, full_array=FALSE)
-    dmp_df <- do.call(rbind, dmp_res)
-    head(dmp_df)
-
-
-    # get the results for the full array cpgs
-    unique(dmp_df$summary_type)
-    unique(dmp_df$region_type)
-
-    # save the full results
-    save_nice_results <- function(region_type){
-        runs <- expand.grid(summary_type=summary_types,
-                            region_type=region_type,
-                            cell_type=cell_types,
-                            trait=traits
-        )
-
-        print(head(runs))
-
-        # get the results for the matched cpgs
-        dmp_res <- apply(runs, 1, load_summary, full_array=FALSE)
-        dmp_df <- do.call(rbind, dmp_res)
-        head(dmp_df)
-
-        # write the full table of results
-        #region_type <- 'full_gene'
-        (savefile <- paste0(savedir, region_type, "_full_DM_results.csv"))
-        write_csv(dmp_df, savefile)
-
-
-        # get significant counts
-        head(dmp_df)
-        sig_df <- dmp_df %>%
-            filter(bh_pval < 0.05)
-        head(sig_df)
-
-        sig_counts <- sig_df %>%
-            rowwise() %>%
-            mutate(gene_feature = paste(gene_id, feature_id, sep='-')) %>%
-            group_by(summary_type, region_type, cell_type) %>%
-            summarize(sig_genes = n_distinct(gene_id),
-                      sig_features = n_distinct(gene_feature)
-            )
-        head(sig_counts)
-
-        # get total counts too
-        total_counts <- dmp_df %>%
-            rowwise() %>%
-            mutate(gene_feature = paste(gene_id, feature_id, sep='-')) %>%
-            group_by(summary_type, region_type, cell_type) %>%
-            summarize(total_genes = n_distinct(gene_id),
-                      total_features = n_distinct(gene_feature)
-            )
-        head(total_counts)
-
-        # join the sig and total counts together
-        all_counts <- total_counts %>%
-            left_join(sig_counts) %>%
-            mutate(sig_genes = ifelse(is.na(sig_genes), 0, sig_genes)) %>%
-            mutate(sig_features = ifelse(is.na(sig_features), 0, sig_features)) 
-        head(all_counts)
-
-        (savefile <- paste0(savedir, region_type, "_all_counts.csv"))
-        write_csv(all_counts, savefile)
-        1
-    }
-    lapply(region_types, save_nice_results)
-
-
-    # load files from here to combine together
-    (savefiles <- paste0(savedir, region_types, "_all_counts.csv"))
-    combined_counts <- lapply(savefiles, read_csv) %>%
-        do.call(rbind, .)
-    head(combined_counts)
-    dim(combined_counts)
-
-    (savefile <- paste0(savedir, "combined_regions_all_counts.csv"))
-    write_csv(combined_counts, savefile)
-
-    
-    full_df <- NA
-    # combine the two results
-    combined_df <- rbind(dmp_df, full_df) %>%
-        left_join(summary_type_map) %>%
-        left_join(cell_type_map) %>%
-        left_join(region_type_map)
-    head(combined_df)
-    dim(combined_df)
-
-    (savefile <- paste0(savedir, "combined_dm_results.rds"))
-    saveRDS(combined_df, savefile)
-
-    # types of pvalue adjustment performed
-    # plot results for both
-    correction_types <- c('bh', 'bf')
-
-    plotting_dir <- paste0(savedir, "plots/")
-    dir.create(plotting_dir, showWarnings=FALSE)
-
-    # plot the counts of sig dmps
-    correction_type <- correction_types[1]
-    plot_dmp_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE)
-    plot_dmp_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE)
-
-    correction_type <- correction_types[2]
-    plot_dmp_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE)
-    plot_dmp_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE)
-
-    
-    # plot the counts of sig genes
-    correction_type <- correction_types[1]
-    plot_gene_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE)
-    plot_gene_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE)
-
-    correction_type <- correction_types[2]
-    plot_gene_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE)
-    plot_gene_counts_barplot(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE)
-
-
-    # check pcs
-    correction_type <- correction_types[1]
-    check_pcs(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE)
-
-    # plot manhattan plot
-    correction_type <- correction_types[1]
-    plot_manhattan(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE)
-
-    head(combined_df)
-}
-
-
+# Main function for differential methylation analysis
 main <- function(){
     # define parameter choices for all runs
     region_types <- c('gene_body', 'preTSS', 'full_gene', 'promoters')
@@ -4501,7 +4471,10 @@ main <- function(){
         mutate(rn = row_number())
     head(runs, 10)
     
-    row <- runs[1,] # for testing interactively
+    # interactive testing (selects first row of data)
+    row <- runs[1,] 
+
+    # function to process each row of the data
     process_row <- function(row){
         # get the parameters for this run
         region_type <- row[['region_type']] %>% as.character()
@@ -4516,118 +4489,29 @@ main <- function(){
 
         # load phenotype data
         pheno <- load_pheno(cell_type)
-        head(pheno)
-
 
         # load methylation data
         meth <- load_meth(region_type, summary_type, cleaned_str, cell_type)
-        head(meth)
-        head(meth)[1:10]
-
 
         # reduce the cpgs to only those used to make the averages and regional pcs
         if (summary_type == 'cpgs'){
             print("Matching cpgs to region annotations")
-
-            # match the cpgs to the regions
-            # load cpg-gene map for region
-            datafile <- paste0(datadir,
-                               "/", region_type, "_", cell_type, "_gene_cpg_map.rds")
-            cpg_map <- readRDS(datafile)
-            head(cpg_map)
-
-            # get cpg positions and id
-            datafile <- paste0(datadir,
-                               cell_type, "_cpg_position_map.rds")
-            pos_map <- readRDS(datafile) %>%
-                rename(cpg_id = cpg)
-            head(pos_map)
-
-            # combine annots
-            ext_map <- cpg_map %>%
-                left_join(pos_map)
-            head(ext_map)
-
-            head(meth)
-
-            keep_probes <- intersect(rownames(meth), ext_map$cpg_id)
-            length(keep_probes)
-
-            sub_meth <- meth[keep_probes,]
-            dim(meth)
-            dim(sub_meth)
-
-            meth <- sub_meth
+            meth <- match_cpgs_to_regions(meth, region_type, cell_type)
         }
 
-
-        # get global PCs to use as covariates
-        global_pcs = NA
-        if (include_global){
-            # select the appropriate global pcs
-            if (cell_type != 'bulk'){
-                pcs_file <- paste0(svddir, cleaned_str, "cleaned_", cell_type, "_global_pcs.rds")
-            } else{
-                pcs_file <- paste0(svddir, "cleaned_bulk_global_pcs.rds")
-            }
-            pcs_file
-
-            # read in the global pcs that were computed in the 
-            # 02_batch_correction script in the 02_deconvolution directory
-            pcs <- readRDS(pcs_file)
-            pcs <- pcs[-1,]
-            head(pcs)
-
-            if (protect_global){
-                # do not include PCs if they have no significant correlation with
-                # the outcome trait, batch, pmi, and study
-                print(paste("Protecting global PCs"))
-
-                 #filter pcs to only those that we want to remove
-                 #load lm pvals for global PCs
-                savefile <- paste0(svddir, cleaned_str, "cleaned_", cell_type, "_pc_lm_pvals.rds")
-                lm_pval <- readRDS(savefile)
-                head(lm_pval)
-
-                # find the pcs to protect
-                thresh <- 0.1
-                protect_pcs <- lm_pval %>%
-                    select(-pct_var, -pval) %>%
-                    spread(trait, bf_pval)
-
-                protect_pcs['trait'] <- protect_pcs[trait]
-                protect_pcs <- protect_pcs %>%
-                    select(pc, trait, meth.batch, pmi, Study) %>%
-                    filter(
-                           trait < thresh,
-                           meth.batch >= thresh,
-                           pmi >= thresh,
-                           Study >= thresh
-                    ) %>%
-                    mutate(pc = str_replace(pc, 'pc_', 'PC'))
-                head(protect_pcs)
-
-                # these pcs should be removed from covariates
-                head(pcs)
-                remove_pcs <- setdiff(colnames(pcs), protect_pcs$pc)
-                remove_pcs
-
-                global_pcs <- pcs[,remove_pcs] 
-            } else{
-                print(paste("NOT protecting global PCs"))
-                global_pcs <- pcs
-            } 
-        }
-        head(global_pcs)
+        # OPTIONAL: get global PCs to use as covariates
+        global_pcs <- get_global_pcs(cell_type, include_global)
 
         # run dmp analysis
         dmp_res <- run_dmp(meth, pheno, global_pcs, region_type, summary_type, cleaned_str, trait, cell_type, shuffle_pheno, shuffle_num=1)
+
+        # output progress and return results
         print("-----------------------------------------------")
 
         1
     }
 
-    dmp_res <- apply(runs, 1, process_row)
+    dmp_out <- apply(runs, 1, process_row)
 
     # check the results
     check_results()
