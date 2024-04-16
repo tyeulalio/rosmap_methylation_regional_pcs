@@ -170,6 +170,7 @@ match_cpgs_to_regions <- function(meth, region_type, cell_type){
 
     head(meth)
 
+    # keep methylation probes that have a cpg id
     keep_probes <- intersect(rownames(meth), ext_map$cpg_id)
     length(keep_probes)
 
@@ -853,8 +854,10 @@ compute_global_pcs <- function(meth, region_type, cleaned_str, trait, cell_type)
 
 ## --- plotting functions -- ##
 plot_dmp_counts_barplot <- function(combined_df, correction_type, summary_type_colors, plotting_dir, full_array){
-    head(combined_df)
+    # plots several different types of barplots
+    # to visualize the CpG-level results for DM analysis
 
+    ## -- setting up the parameters for the data -- ##
     # select the method that was run
     # select the path that matches
     full_array_str <- "full_array"
@@ -893,7 +896,7 @@ plot_dmp_counts_barplot <- function(combined_df, correction_type, summary_type_c
             filter(!full_array)
     }
 
-    # filter fo significant p-vals
+    # filter for significant p-vals
     # count the number of sig reults for each group
     head(formatted_df)
     sig_counts <- formatted_df %>%
@@ -942,18 +945,24 @@ plot_dmp_counts_barplot <- function(combined_df, correction_type, summary_type_c
                               summary_type, 'white'))
     head(formatted_counts)
 
+    # compare proportions of features that were found
+    # to be significant since each summary type
+    # has different number of total features
     compare_feature_proportions <- function(){
         # compare proportion of features that were found to be significant
         # out of the total number of features
         head(formatted_df)
 
+        # add indicator column for significant results
         cmp_df <- formatted_df %>%
             mutate(dm = adj_pval < 0.05) %>%
             select(feature_id, summary_type, region_type, cell_type, adj_pval, trait, dm)
         head(cmp_df)
 
+        # just changing name for ease
         ad_counts <- cmp_df
 
+        # get all the different combinations of parameters
         runs <- expand.grid(cell_type = unique(ad_counts$cell_type),
                        region_type = unique(ad_counts$region_type),
                        trait = unique(ad_counts$trait),
@@ -968,6 +977,9 @@ plot_dmp_counts_barplot <- function(combined_df, correction_type, summary_type_c
         head(runs)
         dim(runs)
 
+        # testing to see if there is a significant difference
+        # between the proportions identified with sifnificant DM
+        # using each summary type
         row <- runs[1,]
         test_feature_props <- function(row){
             # define the parameters for this run
@@ -1133,11 +1145,12 @@ plot_dmp_counts_barplot <- function(combined_df, correction_type, summary_type_c
     }
 
 
-    # plot the counts of significant DMPs with traits
+    # plot the counts of significant DMPs across different outcome traits
     with_cpgs=TRUE
     plot_full_gene_counts_with_traits <- function(with_cpgs){
         head(formatted_counts)
 
+        # either include CpG data or not
         filtered_counts <- formatted_counts %>%
             filter(summary_type != 'CpGs') %>%
             filter(region_type == 'Full gene') 
@@ -1147,6 +1160,7 @@ plot_dmp_counts_barplot <- function(combined_df, correction_type, summary_type_c
         }
         head(filtered_counts)
 
+        # plot barplot with outcome traits faceted
         p <- filtered_counts %>%
             mutate(sig_genes = sig_dmp) %>%
             ggplot(aes(x=cell_type, y=sig_genes, fill=summary_type)) +
@@ -1179,6 +1193,7 @@ plot_dmp_counts_barplot <- function(combined_df, correction_type, summary_type_c
             xlab("Cell types") +
             ylab("Significant DM probes")
 
+            # save the results
             main_filename = "_traits_fullGene_dm_DMP_counts_barplot.png"
             # not including cpgs
             savefile <- paste0(sub_dir, correction_type, 
@@ -1211,6 +1226,8 @@ plot_dmp_counts_barplot <- function(combined_df, correction_type, summary_type_c
 
 
     # plot the counts of significant DMPs
+    # this is for a single trait
+    # has region type and cell type as facets - supplementary figure.
     head(formatted_counts)
     p <- formatted_counts %>%
         filter(summary_type %in% c('Avgs', 'PCs')) %>%
@@ -1471,6 +1488,7 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
     # plot results on a gene-level
     head(combined_df)
 
+    # -- initial setup for the parameters used for the data -- #
     print(paste("correction type", correction_type))
 
     full_array_str <- "full_array"
@@ -1498,6 +1516,8 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
         mutate(full_array = TRUE)
     head(formatted_df)
 
+    # count the number of significant and non-significant results for each run
+    # on a GENE level
     check_sig <- function(){
         # get number of cpgs per pc
         list.files(datadir)
@@ -1521,7 +1541,7 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
         table(sig_df$feature)
         head(sig_df)
 
-        # filter for non-isgnificant results
+        # filter for non-significant results
         nsig_df <- formatted_df %>%
             filter(adj_pval > 0.05) %>%
             left_join(cpg_counts) %>%
@@ -1586,7 +1606,8 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
 
     }
 
-    # plot combined summary type upset plot
+    # plot combined summary type upset plot to visualize the
+    # in DM genes across cell types
     tr = 'ceradsc'
     plot_celltype_upset_withBothSummaries <- function(tr){
         # create upset plot
@@ -1594,6 +1615,8 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
 
         # formta the cell type upset input
         head(formatted_df)
+
+        # get the pcs results
         pcs_df <- formatted_df %>%
             mutate(summary_type=formatted_st,
                    cell_type=formatted_ct,
@@ -1609,6 +1632,7 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
             spread(cell_type, exists, fill=0) 
         head(pcs_df)
 
+        # get the avgs results
         avgs_df <- formatted_df %>%
             mutate(summary_type=formatted_st,
                    cell_type=formatted_ct,
@@ -1724,6 +1748,8 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
 
     }
 
+    # Create upset plot to visualize the overlap in DM genes 
+    # for a single summary type
     head(formatted_df)
     st = 'avgs'
     tr = 'ceradsc'
@@ -1800,6 +1826,9 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
     plot_upset(st='PCs', 'ceradsc')
     plot_upset(st='Avgs', 'ceradsc')
 
+
+    # create Upset plot to visualize the overlap in DM genes
+    # across region types
     head(formatted_df)
     st = 'Avgs'
     tr = 'ceradsc'
@@ -1919,211 +1948,6 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
     sig_counts <- counts$sig_counts
     formatted_counts <- counts$formatted_counts
 
-    sig_counts %>% head()
-
-    compare_proportions <- function(){
-        head(formatted_df)
-
-
-        # compare proportions 
-        head(formatted_counts)
-        wide_counts <- formatted_counts %>%
-            select(region_type, trait, summary_type, cell_type,
-                   sig_genes, total_count) 
-            #spread(summary_type, sig_genes) 
-            #mutate(Avgs = as.numeric(Avgs)) %>%
-            #mutate(PCs = as.numeric(PCs)) %>%
-            #mutate(total_count = as.numeric(total_count)) 
-        head(wide_counts)
-
-        row <- wide_counts[1,]
-        row
-
-        ct = 'Oligo/OPC'
-        st = 'Avgs'
-        rt1 = '1to5kb'
-        rt2 = 'Promoter'
-        test_regiontype_props <- function(rt1, rt2, st, ct){
-            print(paste("processing", rt1, rt2, st, ct))
-            head(formatted_counts)
-            test_counts <- formatted_counts %>%
-                filter(summary_type == st,
-                       cell_type == ct,
-                       region_type %in% c(rt1, rt2)
-                ) 
-            test_counts
-            rownames(test_counts) <- test_counts$region_type
-
-            n1 <- test_counts[rt1,]$sig_genes
-            n2 <- test_counts[rt2,]$sig_genes
-
-            total1 <- test_counts[rt1,]$total_count
-            total2 <- test_counts[rt2,]$total_count
-
-            print(paste(rt1, n1, total1, round(n1/total1,4)))
-            print(paste(rt2, n2, total2, round(n2/total2,4)))
-
-            res <- prop.test(x=c(n1, n2),
-                             n=c(total1, total2),
-                      alternative='two.sided'
-            )
-            res
-            names(res)
-            res$conf.int[[1]]
-
-            data.frame(region_type1 = rt1,
-                       num_sig1 = n1,
-                       total1 = total1,
-                       region_type2 = rt2,
-                       num_sig2 = n2,
-                       total2 = total2,
-                       pval = res$p.value,
-                       lower_CI = res$conf.int[[1]],
-                       upper_CI = res$conf.int[[2]]
-            )
-        }
-
-
-        rts <- unique(formatted_counts$region_type) %>% as.character()
-        rts <- setdiff(rts, 'Astro enh')
-        rt2 <- 'Full gene'
-        res <- lapply(rts, test_regiontype_props, rt2, st, ct)
-        res_df <- do.call(rbind, res) %>%
-            mutate(prop1 = num_sig1 / total1,
-                   prop2 = num_sig2 / total2,
-                   sig = ifelse(pval < 0.05, '*', ''),
-                   greater = prop2 > prop1
-            )
-        res_df
-
-
-        props <- apply(wide_counts, 1, test_props)
-        props_df <- do.call(rbind, props)
-        head(props_df)
-        test_props <- function(row){
-            #print(row)
-            pcs_n <- row[['PCs']] %>% as.numeric()
-            avgs_n <- row[['CpGs']] %>% as.numeric()
-            total_n <- row[['total_count']] %>% as.numeric()
-            #print(paste(pcs_n, avgs_n, total_n))
-
-            res <- prop.test(x=c(pcs_n, avgs_n),
-                             n=c(total_n, total_n),
-                      alternative='greater'
-            )
-
-            data.frame(region_type=row[['region_type']],
-                       trait=row[['trait']],
-                       cell_type=row[['cell_type']],
-                       pval=res$p.value)
-        }
-        props <- apply(wide_counts, 1, test_props)
-        props_df <- do.call(rbind, props)
-        head(props_df)
-
-        props_corrected <- props_df %>%
-            group_by(trait, greater_st, lesser_st, cell_type) %>%
-            mutate(adj_pval = p.adjust(pval, method='bonferroni'))
-        head(props_corrected)
-
-        table(props_corrected$pval < 0.05)
-        table(props_corrected$adj_pval < 0.05)
-        head(wide_counts)
-
-    }
-
-
-    # plot the counts of significant DMPs
-    with_cpgs=FALSE
-    tr = "ceradsc"
-    plot_full_gene_counts <- function(with_cpgs, tr){
-        head(formatted_counts)
-
-        filtered_counts <- formatted_counts %>%
-            filter(summary_type != 'CpGs') %>%
-            filter(region_type == 'full_gene', 
-                   trait == tr
-            ) 
-        if (with_cpgs){
-            filtered_counts <- formatted_counts %>%
-                filter(region_type == 'Full gene', 
-                       trait == tr
-                ) 
-        }
-
-        head(filtered_counts)
-        p <- filtered_counts %>%
-            left_join(summary_type_map) %>%
-            left_join(cell_type_map) %>%
-            mutate(formatted_trait = "CERAD Score") %>%
-            ggplot(aes(x=formatted_ct, y=sig_genes, fill=formatted_st)) +
-            geom_bar(stat='identity', position='dodge') +
-            geom_text(aes(label=label,
-                          #y=ypos,
-                          y=sig_genes,
-                          #color=color
-                          ),
-                      hjust=0.5,
-                      vjust=-0.5,
-                      show.legend=FALSE,
-                      size=5,
-                      position=position_dodge(width=0.9)
-                      ) +
-            #facet_grid(region_type ~ cell_type, scales='fixed') +
-            scale_color_manual(values=summary_type_colors, name="Summary type") + #, breaks=summary_types) +
-            scale_fill_manual(values=summary_type_colors, name="Summary type") + #, breaks=summary_types) +
-            theme_bw() +
-            theme(
-                  strip.background=element_rect(fill='white', color='black'),
-                  panel.spacing=unit(0, 'lines'),
-                  panel.border=element_rect(color='black', fill=NA, linewidth=0.5),
-                  text=element_text(size=20, family='Open Sans'),
-                  legend.title=element_text(size=20, face='bold'),
-                  plot.title=element_text(hjust=0.5),
-                  axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0))
-            ) +
-            ggtitle(paste(tr, correction_type, "sig genes")) +
-            xlab("Summary types") +
-            ylab("Significant DM genes")
-
-            main_filename = "_fullGene_dm_genes_counts_barplot.png"
-            # not including cpgs
-            savefile <- paste0(sub_dir, tr, "_", correction_type, 
-                               main_filename)
-            if (full_array){
-                savefile <- paste0(sub_dir, tr, "_", correction_type, 
-                                   "_fullArray", 
-                                   main_filename)
-            }
-            if (with_cpgs){
-                # inlucde cpgs
-                savefile <- paste0(sub_dir, tr, "_", correction_type, 
-                                   "_withCpgs",
-                                   main_filename)
-                if (full_array){
-                    savefile <- paste0(sub_dir, tr, "_", correction_type, 
-                                       "_withCpgs",
-                                       "_fullArray", 
-                                       main_filename)
-                }
-            }
-            savefile
-
-            ggsave(savefile, plot=p, width=12, height=7, units='in')
-
-
-            main_filename = "_fullGene_dm_genes_counts_barplot.rds"
-            savefile <- paste0(sub_dir, tr, "_", correction_type, 
-                               main_filename)
-            savefile
-            saveRDS(p, savefile)
-        1
-    }
-
-    #with_cpgs=FALSE
-    #plot_full_gene_counts(with_cpgs=TRUE)
-    #plot_full_gene_counts(with_cpgs=FALSE, 'ceradsc')
-
 
     # plot the counts of significant DMPs with traits
     with_cpgs=FALSE
@@ -2168,6 +1992,7 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
 
         summary_type_colors
 
+        # uncomment the facets line if there are multiple traits
         p <- filtered_counts %>%
             ggplot(aes(x=cell_type, y=sig_genes, fill=summary_type)) +
             geom_bar(stat='identity', position='dodge',
@@ -2234,106 +2059,9 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
     }
     
     unique(formatted_df$region_type)
-    #plot_full_gene_counts_with_traits(with_cpgs=FALSE, tr="")
     plot_full_gene_counts_with_traits(with_cpgs=TRUE, rt='Full gene', tr='ceradsc')
     plot_full_gene_counts_with_traits(with_cpgs=TRUE, rt='Promoter', tr='ceradsc')
     plot_full_gene_counts_with_traits(with_cpgs=TRUE, rt='Gene body', tr='ceradsc')
-
-
-    # plot the counts of significant DMPs with traits
-    with_cpgs=FALSE
-    ct="Bulk"
-    plot_allRegions_oneCelltype <- function(with_cpgs, ct, tr){
-        head(formatted_counts)
-
-        filtered_counts <- formatted_counts %>%
-            filter(summary_type != 'CpGs') %>%
-            filter(cell_type == ct)
-        if (with_cpgs){
-            filtered_counts <- formatted_counts %>%
-                filter(cell_type == ct)
-        }
-
-        filtered_counts <- filtered_counts %>%
-            filter(trait == tr)
-
-        # update the y position 
-        filtered_counts <- filtered_counts %>%
-            #mutate(max_dmp = max(sig_genes)) %>%
-            #mutate(ypos = ifelse(sig_genes < max_dmp-(max_dmp/2),
-                                 #sig_genes,
-                                 #sig_genes-(max_dmp*(1/2)))) %>%
-            #mutate(color = ifelse(sig_genes < max_dmp-(max_dmp/2),
-                                  #as.character(summary_type), 'white')) %>%
-            mutate(ypos=sig_genes,
-                  color=as.character(summary_type)
-            )
-        head(filtered_counts)
-
-        summary_type_colors
-
-        p <- filtered_counts %>%
-            ggplot(aes(x=region_type, y=sig_genes, fill=summary_type)) +
-            geom_bar(stat='identity', position='dodge',
-                     show.legend=TRUE) +
-            geom_text(aes(label=label,
-                          y=ypos,
-                          color=color
-                          ),
-                      hjust=0.5,
-                      vjust=-0.5,
-                      show.legend=FALSE,
-                      size=5,
-                      position=position_dodge(width = .9)
-                      ) +
-            facet_grid(trait ~ ., scales='fixed') +
-            scale_color_manual(values=summary_type_colors, guide="none") +
-            scale_fill_manual(name="Summary type", values=summary_type_colors) +
-            theme_bw() +
-            theme(
-                  strip.background=element_rect(fill='white', color='black'),
-                  panel.spacing=unit(0, 'lines'),
-                  panel.border=element_rect(color='black', fill=NA, linewidth=0.5),
-                  text=element_text(size=20, family='Open Sans'),
-                  legend.title=element_text(size=20, face='bold'),
-                  plot.title=element_text(hjust=0.5),
-                  axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0)),
-                  axis.text.x=element_text(angle=30, vjust=1, hjust=1)
-            ) +
-            #coord_cartesian(ylim=c(0,270)) +
-            ggtitle(paste(correction_type, "sig genes")) +
-            xlab("Cell types") +
-            ylab("Significant DM genes")
-
-            main_filename = paste0("_traits_allRegions_", ct, "_dm_genes_counts_barplot.png")
-            # not including cpgs
-            savefile <- paste0(sub_dir, correction_type, 
-                               main_filename)
-            if (full_array){
-                savefile <- paste0(sub_dir, correction_type, 
-                                   "_fullArray", 
-                                   main_filename)
-            }
-            if (with_cpgs){
-                # inlucde cpgs
-                savefile <- paste0(sub_dir, correction_type, 
-                                   "_withCpgs",
-                                   main_filename)
-                if (full_array){
-                    savefile <- paste0(sub_dir, correction_type, 
-                                       "_withCpgs",
-                                       "_fullArray", 
-                                       main_filename)
-                }
-            }
-            savefile
-
-            ggsave(savefile, plot=p, width=10, height=7, units='in')
-        1
-    }
-    
-    plot_allRegions_oneCelltype(with_cpgs=FALSE, ct="Bulk", tr="ceradsc")
-    plot_allRegions_oneCelltype(with_cpgs=TRUE, ct="Bulk", tr="ceradsc")
 
 
     # plot with other region types
@@ -2440,255 +2168,6 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
     plot_region_gene_counts(with_cpgs=FALSE, trait='new_apoe')
 
 
-    # compare region types
-    compare_region_types <- function(){
-        # compare full gene results to the other region types within it
-        head(formatted_df)
-        sig_df <- formatted_df %>%
-            filter(adj_pval < 0.05) %>%
-            select(gene_id,trait, summary_type, region_type, cell_type, full_array) 
-        head(sig_df)
-
-        # get the sub regions of full gene
-        unique(sig_df$region_type)
-        contained_regions <- c("Promoters", "Exons", "Introns", "1to5kb", "5UTRs", "3UTRs")
-
-        contained_df <- sig_df %>%
-            filter(region_type %in% contained_regions) %>%
-            select(-full_array, -region_type) %>%
-            mutate(in_contained = TRUE)
-        head(contained_df)
-
-        full_df <- sig_df %>%
-            filter(region_type == "Full genes") %>%
-            select(-region_type, -full_array) %>%
-            mutate(in_full = TRUE)
-        head(full_df)
-
-        st <- 'Avgs'
-        combined_df <- full_df %>%
-            full_join(contained_df) %>%
-            filter(summary_type == st) %>%
-            unique() %>%
-            mutate(in_contained = ifelse(is.na(in_contained), FALSE, in_contained)) %>%
-            mutate(in_full = ifelse(is.na(in_full), FALSE, in_full)) %>%
-            mutate(dm_gene = ifelse(in_full & in_contained, "both", NA),
-                   dm_gene = ifelse(!in_full & in_contained, "sub_only", dm_gene),
-                   dm_gene = ifelse(in_full & !in_contained, "full_only", dm_gene)
-            )
-        head(combined_df)
-
-        combined_df %>%
-            filter(dm_gene == 'sub_only') %>%
-            head()
-
-
-        p <- ggplot(combined_df) +
-            geom_bar(aes(x=cell_type, fill=dm_gene),
-                     position='dodge'
-            ) +
-            facet_grid(trait ~ .) +
-            theme_bw() +
-            theme(
-                  axis.text.x=element_text(angle=30, vjust=1, hjust=1),
-                  text=element_text(size=20, family='Open Sans'),
-                  #legend.title=element_text(size=16, face='bold'),
-                  plot.title=element_text(hjust=0.5),
-                  axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0))
-            ) +
-            #coord_cartesian(ylim=c(0,150)) +
-            ggtitle(paste(trait, st, correction_type, "sig genes")) +
-            xlab("Cell types") +
-            ylab("Number of significant DM genes")
-
-        main_filename = "_compare_regions.png"
-        # not including cpgs
-        savefile <- paste0(sub_dir, st, correction_type, 
-                           main_filename)
-        if (full_array){
-            savefile <- paste0(sub_dir, st, correction_type, 
-                               "_fullArray", 
-                               main_filename)
-        }
-        savefile
-
-        ggsave(savefile, plot=p, width=8, height=7, units='in')
-    }
-
-    with_cpgs=FALSE
-    plot_region_gene_counts_with_traits <- function(with_cpgs){
-        head(formatted_counts)
-
-        filtered_counts <- formatted_counts %>%
-            filter(!is.na(cell_type)) %>%
-            #filter(summary_type != 'CpGs') %>%
-            unique() %>%
-            ungroup() %>%
-            mutate(max_dmp = max(sig_genes)) %>%
-            mutate(ypos = ifelse(sig_genes < max_dmp-(max_dmp/2),
-                                 sig_genes,
-                                 sig_genes-(max_dmp*(1/2)))) %>%
-            mutate(color = ifelse(sig_genes < max_dmp-(max_dmp/2),
-                                  summary_type, 'white')) 
-        if (with_cpgs){
-            filtered_counts <- formatted_counts 
-        }
-
-        p <- filtered_counts %>%
-            ggplot(aes(x=cell_type, y=sig_genes, fill=summary_type)) +
-            geom_bar(stat='identity', position='dodge') +
-            geom_text(aes(label=label,
-                          y=ypos,
-                          color=color
-                          ),
-                      hjust=0.5,
-                      vjust=-0.5,
-                      show.legend=FALSE,
-                      size=5,
-                      ) +
-            facet_grid(trait ~ region_type, scales='fixed') +
-            scale_color_manual(values=summary_type_colors, breaks=summary_types) +
-            scale_fill_manual(values=summary_type_colors, breaks=summary_types) +
-            theme_bw() +
-            theme(
-                  axis.text.x=element_text(angle=80, vjust=0.5),
-                  text=element_text(size=16, family='Open Sans'),
-                  legend.title=element_text(size=16, face='bold'),
-                  plot.title=element_text(hjust=0.5),
-                  axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0))
-            ) +
-            #coord_cartesian(ylim=c(0,150)) +
-            ggtitle(paste(trait, correction_type, "sig genes")) +
-            xlab("Summary types") +
-            ylab("Number of significant DM genes")
-
-            main_filename = "_allRegions_withTraits_dm_genes_counts_barplot.png"
-            # not including cpgs
-            savefile <- paste0(sub_dir, trait, "_", correction_type, 
-                               main_filename)
-            if (full_array){
-                savefile <- paste0(sub_dir, trait, "_", correction_type, 
-                                   "_fullArray", 
-                                   main_filename)
-            }
-            if (with_cpgs){
-                # inlucde cpgs
-                savefile <- paste0(sub_dir, trait, "_", correction_type, 
-                                   "_withCpgs",
-                                   main_filename)
-                if (full_array){
-                    savefile <- paste0(sub_dir, trait, "_", correction_type, 
-                                       "_withCpgs",
-                                       "_fullArray", 
-                                       main_filename)
-                }
-            }
-            savefile
-
-        ggsave(savefile, plot=p, width=15, height=9, units='in')
-        1
-    }
-    #plot_region_gene_counts_with_traits(with_cpgs=FALSE)
-
-    # plot the counts of significant DMPs using a subset of region types
-    restrict_region_types <- function(){
-        head(formatted_counts)
-        p <- formatted_counts %>%
-            filter(region_type %in% c('Full genes', 'Promoters')) %>%
-            #filter(cell_type %in% c('Bulk')) %>%
-            ggplot(aes(x=summary_type, y=sig_genes, fill=summary_type)) +
-            geom_bar(stat='identity', position='dodge') +
-            geom_text(aes(label=label,
-                          y=ypos,
-                          color=color
-                          ),
-                      hjust=0.5,
-                      vjust=-0.5,
-                      show.legend=FALSE,
-                      size=11,
-                      ) +
-            facet_grid(region_type ~ cell_type, scales='fixed') +
-            scale_color_manual(values=summary_type_colors, breaks=summary_types) +
-            scale_fill_manual(values=summary_type_colors, breaks=summary_types) +
-            theme_bw() +
-            theme(
-                  strip.background=element_rect(fill='white', color='black'),
-                  panel.spacing=unit(0, 'lines'),
-                  panel.border=element_rect(color='black', fill=NA, linewidth=0.5),
-                  text=element_text(size=20, family='Open Sans'),
-                  legend.title=element_text(size=20, face='bold'),
-                  plot.title=element_text(hjust=0.5),
-                  axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0))
-            ) +
-            ggtitle(paste(trait, correction_type, "sig genes")) +
-            xlab("Summary types") +
-            ylab("Number of significant DM genes")+
-            coord_cartesian(ylim=c(0,100))
-
-
-        savefile <- paste0(sub_dir, trait, "_", correction_type, 
-                           "_fullgene_dm_genes_counts_barplot.png")
-        if (full_array){
-            savefile <- paste0(sub_dir, trait, "_", correction_type, 
-                               "_fullgene_full_array_dm_genes_counts_barplot.png")
-        }
-        savefile
-
-        ggsave(savefile, plot=p, width=18, height=8, units='in')
-        ggsave(savefile, plot=p, width=4, height=8, units='in')
-        1
-    }
-
-
-    plot_percentages <- function(){
-        # plot the percentages of the counts
-        head(formatted_counts)
-        ymax = max(formatted_counts$percent)
-        p <- formatted_counts %>%
-            filter(full_array = TRUE) %>%
-            mutate(label=paste0(round(percent, 2), "%")) %>%
-            ggplot(aes(x=summary_type, y=percent, fill=summary_type)) +
-            geom_bar(stat='identity', position='dodge') +
-            geom_text(aes(label=label,
-                          y=percent,
-                          ),
-                      color='black',
-                      hjust=0.5,
-                      vjust=-0.5,
-                      show.legend=FALSE,
-                      size=8,
-                      position=position_dodge(width=1)
-                      ) +
-            facet_grid(region_type ~ cell_type, scales='fixed') +
-            #scale_color_manual(values=summary_type_colors, breaks=summary_types) +
-            scale_fill_manual(values=summary_type_colors, breaks=summary_types) +
-            theme_bw() +
-            theme(
-                  text=element_text(size=20, family='Open Sans'),
-                  legend.title=element_text(size=20, face='bold'),
-                  plot.title=element_text(hjust=0.5),
-                  axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0))
-            ) +
-            ggtitle(paste(trait, correction_type, "Sig DMPs")) +
-            xlab("Summary types") +
-            ylab("Percentage of significant DM regions") +
-            coord_cartesian(ylim=c(0,ymax+0.2))
-
-        savefile <- paste0(sub_dir, trait, "_", correction_type, 
-                           "_dm_genes_percentage_barplot.png")
-        if (full_array){
-            savefile <- paste0(sub_dir, trait, "_", correction_type, 
-                               "_full_array_dm_genes_percentage_barplot.png")
-        }
-        savefile
-
-        ggsave(savefile, plot=p, width=18, height=13, units='in')
-        1
-    }
-    #plot_percentages()
-
-
-
     plot_total_features <- function(){
         ## -- plot the number of total features per summary type
         head(sig_counts)
@@ -2748,9 +2227,11 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
 
 
     ## -- compare the genes to the opentargets genes
+
+    # load the annotations for AD genes
     load_ad_genes <- function(){
         # load the opentargets genes
-        datafile <- paste0("/home/eulalio/deconvolution/rosmap/data/gene_sets/AD_opentargets.csv")
+        datafile <- paste0("/path/to/AD/genes/AD_opentargets.csv")
         opentargets <- read_csv(datafile)
         head(opentargets)
 
@@ -2759,10 +2240,6 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
         #gene_annots <- read_csv(datafile) %>%
             #rename(gene_no_vers=gene_id,
                    #gene_id=ensembl_gene_id_version) 
-        #head(gene_annots)
-
-        head(formatted_df)
-        head(opentargets)
         #head(gene_annots)
 
         # add gene annotations to the opentargets genes
@@ -2776,6 +2253,8 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
             str_remove("\\.[0-9]+")
         head(genes_novers)
 
+        # get gene symbols to gene ids map
+        # download from biomart if we don't have them saved
         savefile <- paste0(savedir, "gene_symbols.rds")
         if (!file.exists(savefile)){
             ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
@@ -2795,12 +2274,10 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
                    symbol=hgnc_symbol
             )
 
-        length(unique(genes_novers))
-        dim(dm_symbols)
-
         setdiff(genes_novers, dm_symbols$ensembl_gene_id)
 
 
+        # join all the information together
         head(formatted_df)
         head(opentargets_annots)
         dm_opentargets <- formatted_df %>%
@@ -2813,7 +2290,7 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
         dim(dm_opentargets)
 
         # load the NIAGDS genes also
-        datafile <- paste0("/home/eulalio/deconvolution/data/gene_sets/NIAGDS_AD_genes_list.csv")
+        datafile <- paste0("/path/to/NIAGADS/genes/NIAGDS_AD_genes_list.csv")
         niagds <- read_csv(datafile, col_names=c('symbol'))
         head(niagds)
 
@@ -2831,26 +2308,10 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
     opentargets=res$opentargets
     head(all_dm_opentargets)
 
-
     dm_opentargets=all_dm_opentargets %>%
         filter(sig_dm)
     head(dm_opentargets)
 
-    visualize_groups <- function(){
-        dm_counts <- all_dm_opentargets %>%
-            filter(summary_type == 'PCs',
-                   adj_pval < 0.05) %>%
-            count(gene_id, summary_type, region_type, cell_type, trait) %>%
-            filter(n > 1)
-        head(dm_counts)
-
-        tmp <- all_dm_opentargets %>%
-            inner_join(dm_counts) %>%
-            arrange(-overallAssociationScore)
-        head(tmp)
-        dim(tmp)
-        unique(tmp$symbol)
-    }
 
     # create glm contrast data
     create_glm_data <- function(){
@@ -2891,21 +2352,24 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
         table(filtered_data$ad_gene)
         table(filtered_data$Avgs_DM)
         table(filtered_data$PCs_DM)
-
-
-        
     }
 
 
+    # create plot that focuses on the AD open targets genes
     quant=0.95
     tr = 'ceradsc'
     plot_focus_genes <- function(quant, tr){
         ## -- focus on just a subset of the genes and region types
         head(dm_opentargets)
+
+        # find the threshold for the percentile that we're interested in
+        # this will filter AD genes based on the open targets association score
         #summary(opentargets$overallAssociationScore)
         #quant=0.7
         (thresh=quantile(opentargets$overallAssociationScore, quant))
 
+        # creating data to test correlation between
+        # AD association score and DM p-value
         head(all_dm_opentargets)
         c <- 0.000001
         sub_dm <- all_dm_opentargets %>%
@@ -2934,35 +2398,13 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
         write_csv(save_data, savefile)        
 
 
-
-        #res <- lm(full_score ~ bh_pval + cell_type + summary_type, data=sub_dm)
-        #res <- lm(logit_score ~ logit_pval + cell_type + summary_type, data=sub_dm)
-        #res <- lm(scaled_score ~ scaled_pval*summary_type + cell_type, data=sub_dm)
+        # testing interaction between summary type and the scores
         res <- lm(scaled_score ~ cell_type + scaled_pval*summary_type + 0, data=sub_dm)
         res <- lm(logit_score ~ cell_type + logit_pval*summary_type + 0, data=sub_dm)
-
         res <- lm(logit_score ~ logit_pval*summary_type + cell_type+0, data=sub_dm)
         summary(res)
 
-        # checking lrt 
-        st_dm <- sub_dm %>%
-            filter(summary_type == 'avgs') %>%
-            filter(cell_type == 'oligo_opc')
-            #mutate(cell_type = factor(cell_type, levels=c('bulk', 'astro', 'endo', 'neuron', 'oligo_opc')))
-        head(st_dm)
-        unique(st_dm$cell_type)
-        summary(lm(logit_score ~ logit_pval, data=st_dm))
-        res1 <- lm(logit_score ~ cell_type * logit_pval, data=st_dm)
-        res2 <- lm(logit_score ~ cell_type + logit_pval, data=st_dm)
-        summary(res1)
-        summary(res2)
-
-        anova(res1, res2, test='LRT')
-
-        #logit_test <- data.frame(x=seq(0,1,0.01)) %>%
-            #mutate(logit_x=log((x+c) / (1-x+c)))
-        #head(logit_test)
-
+        # plot the transformed DM p-value and the AD association score
         # up arrow
         up_arrow_position <- data.frame(x=min(sub_dm$logit_pval), y=-9.5)
         up_text_position <- data.frame(x=-10.5, y=-9.5-0.1)
@@ -2978,7 +2420,6 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
             #filter(!is.na(overallAssociationScore)) %>%
             ggplot(aes(y=logit_score, x=logit_pval)) +
             geom_smooth(method='lm', se=FALSE, linewidth=2, aes(color=formatted_ct, linetype=formatted_st)) +
-            #geom_point(aes(color=formatted_st, shape=formatted_st)) +
             # draw up arrow
             geom_segment(data=up_arrow_position, aes(x=x, y=y-0.25, xend=x, yend=y),
                          arrow=arrow(length=unit(0.3, "cm")), 
@@ -3025,6 +2466,8 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
         saveRDS(p, savefile)
 
 
+        # look at the opentargets genes that pass the threshold
+        # determined above
         head(dm_opentargets)
         filtered_genes <- dm_opentargets %>%
             filter(region_type == 'full_gene') %>%
@@ -3084,9 +2527,6 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
         length(unique(pc_only$gene_id))
         
 
-        #summary_colors <- c(brewer.pal(n=3, name='Dark2')[1:2], 'grey')
-        #summary_colors
-        #summary_type_colors
         summary_colors <- c(summary_type_colors[c('Avgs', 'rPCs')], '#99e6e6')
         summary_colors
 
@@ -3316,1142 +2756,9 @@ plot_gene_counts_barplot <- function(combined_df, correction_type, summary_type_
     plot_focus_genes(quant=quant, 'cat_braaksc')
     plot_focus_genes(quant=quant, 'new_diag')
     plot_focus_genes(quant=quant, 'new_apoe')
-    #plot_focus_genes(quant=quant, 'braaksc')
-
-
-    quant=0
-    compare_ad_proportions <- function(quant){
-        # compare proportions 
-        head(opentargets)
-        (thresh=quantile(opentargets$overallAssociationScore, quant))
-
-        head(all_dm_opentargets)
-
-        (savefile <- paste0(sub_dir, trait, "_DM_AD_counts.png"))
-        p <- all_dm_opentargets %>%
-            mutate(ad_gene = !is.na(overallAssociationScore)) %>%
-            mutate(group = case_when(sig_dm & ad_gene ~ "DM, AD",
-                                     !sig_dm & ad_gene ~ "-DM, AD",
-                                     sig_dm & !ad_gene ~ "DM, -AD",
-                                     !sig_dm & !ad_gene ~ "-DM, -AD"
-                                     )) %>%
-            filter(group %in% c('DM, AD', 'DM, -AD')) %>%
-            ggplot() +
-            geom_bar(aes(x=group, fill=summary_type),
-                     position=position_dodge()) +
-            facet_grid(cell_type ~ region_type, scales='free_y') +
-            scale_fill_manual(values=summary_type_colors, name="Summary type") +
-            theme_bw() +
-            theme(
-                  strip.background=element_rect(fill='white', color='black'),
-                  #panel.spacing=unit(0, 'lines'),
-                  panel.border=element_rect(color='black', fill=NA, linewidth=0.5),
-                  text=element_text(size=14, family='Open Sans'),
-                  legend.title=element_text(face='bold'),
-                  plot.title=element_text(hjust=0.5),
-                  axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0)),
-                  axis.text.x=element_text(angle=50, vjust=1, hjust=1)
-            ) 
-        ggsave(p, file=savefile, width=11, height=8)
-
-
-
-        ad_counts <- all_dm_opentargets
-        runs <- expand.grid(cell_type = unique(ad_counts$cell_type),
-                       region_type = unique(ad_counts$region_type),
-                       trait = unique(ad_counts$trait),
-                       st1 = unique(ad_counts$summary_type),
-                       st2 = unique(ad_counts$summary_type)
-        ) %>%
-            filter(st1 != st2) %>%
-            mutate(rn = row_number())
-        head(runs)
-        runs %>%
-            filter(region_type == 'Full gene')
-
-        row <- runs[49,]
-        compare_st_props <- function(row){
-            ct <- row[['cell_type']] 
-            rt <- row[['region_type']] %>% as.character()
-            tr <- row[['trait']] %>% as.character()
-            st1 <- row[['st1']] %>% as.character()
-            st2 <- row[['st2']] %>% as.character()
-            rn <- row[['rn']] %>% as.character()
-
-            print(paste(ct, rt, tr, st1, st2, rn))
-
-            # filter down to data for this run
-            head(ad_counts)
-            run_counts <- ad_counts %>%
-                filter(trait == tr, 
-                       cell_type == ct,
-                       region_type == rt
-                ) %>% 
-                # make sure these are DM genes only
-                filter(adj_pval < 0.05) %>%
-                select(gene_novers, symbol, overallAssociationScore, summary_type) %>%
-                #unique() %>%
-                # add AD or not column
-                mutate(thresholded_score = ifelse(overallAssociationScore < thresh, NA, overallAssociationScore)) %>%
-                mutate(ad_gene = ifelse(is.na(thresholded_score), 'not_AD', 'AD'))
-            head(run_counts)
-
-            if (nrow(run_counts) == 0){
-                return(NA)
-            }
-            if (length(unique(run_counts$summary_type)) < 2){
-                return(NA)
-            }
-
-            # create a contingency table
-            (tab <- table(run_counts$ad_gene, run_counts$summary_type))
-            tab[1,1] / sum(tab[,1])
-            tab[1,2] / sum(tab[,2])
-
-            # run fisher's exact test
-            (res <- chisq.test(tab))
-            (res <- fisher.test(tab))
-
-            names(res)
-            res$alternative
-            tab
-
-            tab[1,st1]
-
-            data.frame(region_type = rt,
-                       cell_type = ct,
-                       summary_type1 = st1,
-                       summary_type2 = st2,
-                       pval = res$p.value,
-                       lower_CI = res$conf.int[[1]],
-                       upper_CI = res$conf.int[[2]],
-                       odds_ratio = res$estimate[[1]],
-                       st1_ad = tab[['AD', st1]],
-                       st2_ad = tab[['AD', st2]],
-                       st1_nad = tab[['not_AD', st1]],
-                       st2_nad = tab[['not_AD', st2]]
-            ) 
-        }
-
-        res <- apply(runs, 1, compare_st_props)
-        res_df <- do.call(rbind, res)
-        head(res_df)
-
-
-
-        formatted_res <- res_df %>%
-            mutate(sig = pval < 0.05) %>%
-            mutate(prop1 = st1_ad / (st1_ad + st1_nad)) %>%
-            mutate(prop2 = st2_ad / (st2_ad + st2_nad)) 
-        head(formatted_res)
-
-        formatted_res %>%
-            filter(region_type == 'Full gene')
-
-        savefile <- paste0(savedir, "summary_type_dm_ad_proportions_fishers_test_results.rds")
-        savefile
-        saveRDS(formatted_res, savefile)
-        
-
-        unique(all_dm_opentargets$region_type)
-
-        head(formatted_df)
-        head(dm_opentargets)
-
-        ad_total_counts <- all_dm_opentargets %>%
-            select(gene_novers, overallAssociationScore, summary_type, cell_type, region_type, trait) %>%
-            mutate(overallAssociationScore = ifelse(overallAssociationScore < thresh, NA, overallAssociationScore)) %>%
-            mutate(ad_gene = !is.na(overallAssociationScore)) %>%
-            unique() %>%
-            count(summary_type, region_type, cell_type, trait, ad_gene) %>%
-            group_by(summary_type, region_type, cell_type, trait) %>%
-            mutate(total_n = sum(n)) %>%
-            filter(ad_gene)
-        head(ad_total_counts)
-
-        # count total and ad genes
-        head(dm_opentargets)
-        ad_dm_counts <- all_dm_opentargets %>%
-            filter(adj_pval < 0.05) %>%
-            mutate(overallAssociationScore = ifelse(overallAssociationScore < thresh, NA, overallAssociationScore)) %>%
-            mutate(ad_gene = !is.na(overallAssociationScore)) %>%
-            select(gene_id, summary_type, region_type, cell_type, trait, ad_gene) %>%
-            unique() %>%
-            count(summary_type, region_type, cell_type, trait, ad_gene) %>%
-            group_by(summary_type, region_type, cell_type, trait) %>%
-            mutate(total_n = sum(n)) %>%
-            filter(ad_gene)
-        head(ad_dm_counts)
-
-        head(ad_total_counts)
-        ad_total_props <- ad_total_counts %>%
-            rename(total_ad=n, total_genes=total_n) %>%
-            mutate(total_prop=total_ad/total_genes)
-        head(ad_total_props)
-
-        ad_dm_props <- ad_dm_counts %>%
-            rename(sig_ad=n, total_sig=total_n) %>%
-            mutate(sig_prop=sig_ad/total_sig)
-        head(ad_dm_props)
-
-        joined_props <- ad_total_props %>%
-            left_join(ad_dm_props) %>%
-            arrange(region_type, cell_type)
-        head(joined_props)
-
-        joined_props[is.na(joined_props)] <- 0
-        joined_props %>%
-            filter(region_type == '5UTR')
-
-        ad_counts <- joined_props
-        runs <- expand.grid(cell_type = unique(ad_counts$cell_type),
-                       region_type = unique(ad_counts$region_type),
-                       trait = unique(ad_counts$trait),
-                       st = unique(ad_counts$summary_type)
-                       #st2 = unique(ad_counts$summary_type)
-        ) #%>%
-            #filter(st1 != st2)
-        head(runs)
-        dim(runs)
-        runs
-
-        row <- runs[1,]
-        compare_total_props <- function(row){
-            ct <- row[['cell_type']] 
-            rt <- row[['region_type']] %>% as.character()
-            tr <- row[['trait']] %>% as.character()
-            #st1 <- row[['st1']] %>% as.character()
-            #st2 <- row[['st2']] %>% as.character()
-            st <- row[['st']] %>% as.character()
-
-            print(paste(ct, rt, tr, st))
-
-            #head(ad_counts)
-            wide_counts <- ad_counts %>%
-                filter(cell_type == ct,
-                       region_type == rt,
-                       trait == tr,
-                       summary_type == st
-                ) 
-
-            if (nrow(wide_counts) == 0){
-                return(NA)
-            }
-
-            head(wide_counts)
-            n1_label = paste0("total_ad")
-            n2_label = paste0("sig_ad")
-            t1_label = paste0("total_genes")
-            t2_label = paste0("total_sig")
-
-            n1 <- wide_counts[[1,n1_label]] %>% as.numeric()
-            n2 <- wide_counts[[1,n2_label]] %>% as.numeric()
-            t1 <- wide_counts[[1,t1_label]] %>% as.numeric()
-            t2 <- wide_counts[[1,t2_label]] %>% as.numeric()
-
-            print(paste("total", n1, t1, round(wide_counts$total_prop,2), "sig", n2, t2, round(wide_counts$sig_prop,2)))
-
-            if (wide_counts$sig_prop == 0){
-                print("no sig ad genes")
-                return(NA)
-            }
-
-            #res <- tryCatch(
-                #expr={
-                    #prop.test(x=c(n1, n2),
-                         #n=c(t1, t2),
-                          #alternative='greater')},
-                #error=function(cond){
-                    #print('err') 
-                    #return(NA)},
-                #warning=function(cond){
-                    #print('warn') 
-                    #return(NA)}
-            #)
-            res <- prop.test(x=c(n1, n2),
-                             n=c(t1, t2),
-                      alternative='less'
-            )
-            res
-            names(res)
-            res$conf.int[[1]]
-
-            data.frame(region_type = rt,
-                       cell_type = ct,
-                       summary_type = st,
-                       ad_total = n1,
-                       genes_total = t1,
-                       ad_sig = n2,
-                       genes_sig = t2,
-                       pval = res$p.value,
-                       lower_CI = res$conf.int[[1]],
-                       upper_CI = res$conf.int[[2]]
-            ) %>%
-            mutate(
-                       prop_total = ad_total / genes_total,
-                       prop_sig = ad_sig / genes_sig,
-                       greater = prop_sig > prop_total
-                       )
-        }
-        props <- apply(runs , 1, compare_total_props)
-        props_df <- do.call(rbind, props) %>%
-            na.omit()
-        head(props_df)
-        dim(props_df)
-
-        table(props_df$pval < 0.05)
-
-        props_corrected <- props_df %>%
-            group_by(region_type, summary_type) %>%
-            mutate(adj_pval = p.adjust(pval, method='BH')) %>%
-            mutate(sig = ifelse(adj_pval < 0.05, '*', ''))
-        head(props_corrected)
-
-        props_corrected %>%
-            filter(cell_type == 'Neuron',
-                   region_type == 'Shelf'
-            )
-
-        table(props_corrected$pval < 0.05)
-        table(props_corrected$adj_pval < 0.05)
-
-        head(props_corrected)
-        long_props <- props_corrected %>%
-            select(region_type:summary_type, prop_total, prop_sig) %>%
-            spread(summary_type, prop_sig, fill=0) %>%
-            rename(Total=prop_total) %>%
-            gather('summary_type', 'prop', Total, Avgs:PCs) %>%
-            left_join(props_corrected[c('region_type', 'cell_type', 'summary_type', 'adj_pval')]) %>%
-            mutate(adj_pval = ifelse(summary_type == 'Total', 1, adj_pval)) %>%
-            mutate(sig = ifelse(adj_pval < 0.1, '.', ''),
-                   sig = ifelse(adj_pval < 0.05, '*', sig),
-                   sig = ifelse(adj_pval < 0.001, '**',sig)
-            ) %>%
-            unique() 
-        head(long_props)
-
-        foldchange <- long_props %>%
-            select(-adj_pval, -sig) %>%
-            spread(summary_type, prop) %>%
-            gather('summary_type', 'prop', Avgs:PCs) %>%
-            mutate(fold_change = prop / Total) %>%
-            left_join(long_props) %>%
-            mutate(bin_sig = ifelse(sig == "", FALSE, TRUE))
-        head(foldchange)
-
-        long_props %>%
-            filter(
-                   region_type == 'Shelf',
-                   cell_type == 'Neuron'
-            )
-
-        tmp_st_colors <- summary_type_colors
-        i=8
-        tmp_st_colors['Total'] = brewer.pal(i, 'Dark2')[i]
-        head(foldchange)
-        p <- ggplot(foldchange, aes(x=cell_type)) +
-            geom_point(aes(y=fold_change, color=summary_type, size=bin_sig)) +
-            geom_hline(yintercept=1, linetype="dotted") +
-            #geom_bar(aes(fill=summary_type),
-                     #stat='identity',
-                     #position='dodge'
-            #) +
-            #geom_text(aes(label=sig, group=summary_type, y=prop+0.05, color=summary_type), 
-                      #size=5,
-                      #position = position_dodge(width = 0.9),
-                      #) +
-           facet_wrap(. ~ region_type, nrow=2) +
-           scale_color_manual(values=tmp_st_colors, name="Summary type") +
-           scale_fill_manual(values=tmp_st_colors, name="Summary type") +
-           coord_flip() +
-           theme_bw() +
-           theme(text = element_text(size=20),
-                 axis.text.x = element_text(angle=60, hjust=1, vjust=1)
-           ) +
-            xlab("Cell type") +
-            ylab("Proportion of AD genes") +
-            ggtitle(paste("Proportion of significant AD genes", quant, 'ceradsc'))
-
-
-        (savefile <- paste0(sub_dir, tr, "_", correction_type, 
-                           "_quant", round(quant,2),
-                           "_opentargets_proportion_dotplot.png"))
-        ggsave(savefile, plot=p, width=13, height=8, units='in')
-
-
-        # can we run a fisher's test against background 
-        head(dm_opentargets)
-
-        runs <- expand.grid(cell_type = unique(dm_opentargets$cell_type),
-                       region_type = unique(dm_opentargets$region_type),
-                       trait = unique(dm_opentargets$trait),
-                       st = unique(dm_opentargets$summary_type)
-        ) %>%
-        mutate(rn = row_number())
-        head(runs)
-        dim(runs)
-        runs
-
-        row <- runs[1,]
-
-        sub_data <- all_dm_opentargets %>%
-            select(gene_id, symbol, overallAssociationScore, adj_pval, summary_type, region_type, cell_type) %>%
-            mutate(ad_gene = as.numeric(!is.na(overallAssociationScore))) %>%
-            mutate(summary_type = paste(summary_type, "DM", sep='_')) %>%
-            group_by(summary_type, region_type, cell_type, gene_id) %>%
-            arrange(adj_pval) %>%
-            slice(1) %>%
-            mutate(DM = as.numeric(adj_pval < 0.05)) %>%
-            select(-adj_pval) %>%
-            unique() %>%
-            spread(summary_type, DM, fill=0)
-        head(sub_data)
-
-        savefile <- paste0(savedir, "bh_all_ad_dm_glm_formatted_results.rds")
-        savefile
-        saveRDS(sub_data, savefile)
-
-        sub_data <- readRDS(savefile)
-        head(sub_data)
-
-
-        formatted_dat <- sub_data %>%
-            gather('summary_type', 'DM', Avgs_DM:PCs_DM) %>%
-            mutate(summary_type = str_remove(summary_type, "_DM")) %>%
-            mutate(pc = as.numeric(summary_type == 'PCs')) %>%
-            mutate(full_score = ifelse(is.na(overallAssociationScore), 0, overallAssociationScore))
-        head(formatted_dat)
-
-        pc_genes <- formatted_dat %>%
-            filter(summary_type == 'PCs')
-        head(pc_genes)
-
-        avg_genes <- formatted_dat %>%
-            filter(summary_type == 'Avgs')
-
-
-        full_gene_dat <- formatted_dat %>%
-            filter(region_type == 'Full gene')
-        head(full_gene_dat)
-
-        full_lm <- lm(full_score ~ cell_type + DM*summary_type, data=full_gene_dat)
-        summary(full_lm)
-
-
-
-
-
-        # plot the proportions of ad for dm and not dm genes across
-        # summary types, cell types, region types
-        counts <- formatted_dat %>%
-            group_by(region_type, cell_type, summary_type, DM) %>%
-            summarize(ad_prop = sum(ad_gene) / sum(ad_gene %in% c(0,1))) %>%
-            mutate(DM = as.boolean(DM))
-            #spread(DM, ad_prop) 
-        head(counts)
-
-
-        head(all_dm_opentargets)
-        total_ad_prop <- all_dm_opentargets %>%
-            select(gene_id, overallAssociationScore) %>%
-            unique() %>%
-            mutate(ad_gene = !is.na(overallAssociationScore)) %>%
-            summarise(ad_prop = sum(ad_gene) / (sum(ad_gene) + sum(!ad_gene)))
-        total_ad_prop
-
-        p <- ggplot(counts) +
-            geom_bar(aes(x=summary_type, y=ad_prop, fill=as.factor(DM)),
-                     stat='identity', position=position_dodge(width=0.9)
-            ) +
-            facet_grid(region_type ~ cell_type)
-        (savefile <- paste0(sub_dir, "full_ad_props.png"))
-        ggsave(p, file=savefile)
-
-        # create line plot
-        head(counts)
-        p <- counts %>%
-            filter(region_type == 'Full gene') %>%
-            ggplot() +
-            geom_hline(yintercept=total_ad_prop[[1]], linetype='dashed') +
-            geom_point(aes(x=cell_type, y=ad_prop, color=summary_type, fill=summary_type, shape=as.factor(DM), group=summary_type),
-                       alpha=0.9, position=position_dodge(width=0.6), size=3
-                       ) +
-            #facet_wrap(. ~ cell_type, ncol=1) +
-            scale_color_manual(values=summary_type_colors, name="Summary type") +
-            scale_fill_manual(values=summary_type_colors, name="Summary type") +
-            #scale_shape_manual(values=c(1,2)) +
-            #scale_size_manual(values=c(2,3)) +
-            #coord_cartesian(ylim=c(0,0.9)) +
-            guides(shape=guide_legend(title="Differential\nmethylation")) +
-            theme_bw() +
-            theme(
-                  strip.background=element_rect(fill='white', color='black'),
-                  #panel.spacing=unit(0, 'lines'),
-                  panel.border=element_rect(color='black', fill=NA, linewidth=0.9),
-                  text=element_text(size=20, family='Open Sans'),
-                  legend.title=element_text(size=20, face='bold'),
-                  plot.title=element_text(hjust=0.5),
-                  axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0)),
-                  axis.text.x=element_text(angle=30, vjust=1, hjust=1)
-            ) +
-            ggtitle(paste("CERAD score AD proportion")) +
-            ylab("Proportion of Alzheimer's disease genes") +
-            xlab("Region type")
-        (savefile <- paste0(sub_dir, "full_ad_props_line.png"))
-        ggsave(p, file=savefile, width=8, height=7)
-
-        set.seed(1174117171)
-        formatted_dat$permuted_st <- sample(formatted_dat$summary_type, size=nrow(formatted_dat), replace=FALSE)
-        head(formatted_dat)
-        table(formatted_dat$summary_type, formatted_dat$permuted_st)
-
-        glm_dat <- formatted_dat %>%
-            filter(region_type == 'Full gene')
-
-        fit_glmer <- function(glm_dat){
-            # fit model
-            # fit with no intercept
-            res <- glmer(ad_gene ~  pc * DM + (1 | region_type) + (1 | cell_type), data=formatted_dat, family='binomial')
-            #savefile <- paste0(savedir, "glmer_res.rds")
-
-            # fit with intercept
-            res <- glmer(ad_gene  ~ pc + summary_type:DM + (1 | region_type) + (1 | cell_type), data=formatted_dat, family='binomial')
-            savefile <- paste0(savedir, "glmer_res_nointercept.rds")
-
-            # nicely formatted output
-            res <- glm(ad_gene ~  cell_type + summary_type + summary_type:DM + 0, data=glm_dat, family='binomial')
-            summary(res)
-            (tidy_res <- tidy(res, conf.int=TRUE, exponentiate=TRUE))
-            tidy_res
-
-
-            # use a simpler model with no interaction term
-            full_gene_simple_dat <- sub_data %>%
-                filter(region_type == 'Full gene')
-            head(full_gene_simple_dat)
-
-            res <- glm(ad_gene ~ cell_type + Avgs_DM + PCs_DM + 0, data=full_gene_simple_dat, family='binomial')
-            summary(res)
-            (tidy_res <- tidy(res, conf.int=TRUE, exponentiate=TRUE))
-
-            tidy_res
-            formatted_res <- tidy_res %>%
-                mutate(term = str_remove(term, 'cell_type')) %>%
-                mutate(term = ifelse(grepl('DM', term), paste0("DM ", str_remove(term, "_DM")), term)) %>%
-                mutate(formatted_cat = ifelse(grepl('DM', term), 'Summary type', 'Cell type'))
-            formatted_res
-
-            # plot these results
-            #(savefile <- paste0(sub_dir, trait, "_glm_AD_prop_odds_ratios.png"))
-            (savefile <- paste0(sub_dir, trait, "_lm_AD_prop_odds_ratios.png"))
-            p <- formatted_res %>%
-                ggplot(aes(y=reorder(term, estimate), x=estimate, color=formatted_cat)) +
-                geom_point(size=3) +
-                geom_linerange(aes(xmin=conf.low, xmax=conf.high)) +
-                geom_vline(xintercept=1, linetype='dashed', color='grey') +
-                theme_bw() +
-                guides(color=guide_legend(title='Term type')) +
-                scale_color_manual(values=c('cornflowerblue', 'firebrick1')) +
-                theme(
-                      text=element_text(size=20, family='Open Sans'),
-                      legend.title=element_text(size=20, face='bold'),
-                      plot.title=element_text(hjust=0.5)
-                      #axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0)),
-                      #axis.text.x=element_text(angle=30, vjust=1, hjust=1)
-                ) +
-                xlab("Odds ratio") +
-                ylab("Model term")
-            ggsave(p, file=savefile, height=6, width=8)
-
-
-            saveRDS(res, savefile)
-            res <- readRDS(savefile)
-
-            summary(res)
-            (tidy_res <- tidy(res, conf.int=TRUE, exponentiate=TRUE))
-
-            ranef(res)
-
-
-            # model with no intercept, but less nicely formatted output
-            res_noint_noformat <- glmer(ad_gene  ~ summary_type*DM + (1 | region_type) + (1 | cell_type), data=formatted_dat, family='binomial')
-
-            savefile <- paste0(savedir, "glmer_res_nointercept_noformat.rds")
-            saveRDS(res_noint_noformat, savefile)
-
-            summary(res_noint_noformat)
-            tidy(res_noint_noformat)
-
-
-            # try permuting summary type 
-            res_perm <- glmer(ad_gene  ~  permuted_st + permuted_st:DM + (1 | region_type) + (1 | cell_type) + 0, data=formatted_dat, family='binomial')
-            savefile <- paste0(savedir, "glmer_res_permuted_summaryType.rds")
-            savefile
-            saveRDS(res_perm, savefile)
-
-            summary(res_perm)
-            (tidy_res <- tidy(res_perm, conf.int=TRUE, exponentiate=TRUE))
-        }
-
-
-        head(runs)
-        runs %>%
-            filter(cell_type == 'Neuron', 
-                   region_type == '5UTR'
-            )
-        row <- runs[23,]
-        compare_total_props <- function(row){
-            ct <- row[['cell_type']] 
-            rt <- row[['region_type']] %>% as.character()
-            tr <- row[['trait']] %>% as.character()
-            st <- row[['st']] %>% as.character()
-            rn <- row[['rn']] %>% as.character
-
-            print(paste(ct, rt, tr, st, rn, "out of", nrow(runs)))
-
-            # subset the data
-            head(sub_data)
-            run_data <- sub_data %>%
-                filter(cell_type == ct,
-                       region_type == rt
-                ) 
-            head(run_data)
-
-            # pivot data
-            long_data <- run_data %>%
-                gather('summary_type', 'DM', Avgs_DM:PCs_DM) %>%
-                mutate(summary_type=str_remove(summary_type, "_DM")) %>%
-                # filter for summary type
-                filter(summary_type == st)
-            head(long_data)
-
-            tab <- table(long_data$ad_gene, long_data$DM)
-            tab
-
-            if (ncol(tab) < 2) return(NA)
-            if (nrow(tab) < 2) return(NA)
-
-            result <- fisher.test(tab, conf.level=0.95)
-            or <- (result$estimate)
-            ci <- result$conf.int
-            lci <-  ci[[1]]
-            uci <-  ci[[2]]
-            pval <- result$p.value
-
-            res <- data.frame(summary_type=st,
-                              region_type=rt,
-                              cell_type=ct,
-                              odds_ratio=or,
-                              lower_ci=lci,
-                              upper_ci=uci,
-                              pval=pval
-            )
-        }
-
-        res <- apply(runs, 1, compare_total_props)
-        res_df <- do.call(rbind, res)
-        head(res_df)
-
-        formatted_df <- res_df %>%
-            group_by(summary_type) %>%
-            mutate(adj_pval = p.adjust(pval, method='BH')) %>%
-            mutate(log_or = log(odds_ratio),
-                   log_lower_ci = log(lower_ci),
-                   log_upper_ci = log(upper_ci)
-            ) %>%
-            na.omit() %>%
-            mutate(sig = adj_pval < 0.05)
-            #mutate(sig = pval < 0.05)
-        head(formatted_df)        
-
-        table(formatted_df$pval < 0.05)
-        table(formatted_df$adj_pval < 0.05)
-
-        head(formatted_df)
-        p <- formatted_df %>%
-            ggplot(aes(x=cell_type, y=log_or, color=summary_type)) +
-            geom_point(aes(shape=sig),
-                       size=3,
-                       position=position_dodge(width=0.5)) +
-            geom_linerange(aes(ymin=log_lower_ci, ymax=log_upper_ci),
-                           position=position_dodge(width=0.5)) +
-            geom_hline(yintercept=0, linetype="dotted") +
-           facet_wrap(. ~ region_type, nrow=2, scales='fixed') +
-           scale_color_manual(values=tmp_st_colors, name="Summary type") +
-           scale_fill_manual(values=tmp_st_colors, name="Summary type") +
-           coord_flip(ylim=c(-2,2)) +
-           theme_bw() +
-           theme(text = element_text(size=20),
-                 axis.text.x = element_text(angle=0, hjust=0, vjust=0)
-           ) +
-            xlab("Cell type") +
-            ylab("Fisher's Test Log Odds Ratio") +
-            ggtitle(paste("Log Odds Ratio of DM AD genes", quant, 'ceradsc'))
-
-        (savefile <- paste0(sub_dir, tr, "_", correction_type, 
-                           "_quant", round(quant,2),
-                           "_opentargets_logodds_dotplot.png"))
-        ggsave(savefile, plot=p, width=13, height=8, units='in')
-    }
 
     1
 }
-
-
-
-check_pcs <- function(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=TRUE){
-    head(combined_df)
-
-
-    print(paste("correction type", correction_type))
-
-    full_array_str <- "full_array"
-    if (!full_array) full_array_str <- "matched_array"
-
-    sub_dir <- paste0(plotting_dir, correction_type, "_", full_array_str, "/")
-    dir.create(sub_dir, showWarnings=FALSE)
-
-    # set the p-value correction type
-    combined_df$adj_pval <- combined_df$bh_pval
-    if (correction_type == 'bf') combined_df$adj_pval <- combined_df$bf_pval
-
-
-    # filter for using the full array or not
-    if (full_array){
-        combined_df <- combined_df %>%
-            filter(full_array)
-    } else{
-        combined_df <- combined_df %>%
-            filter(!full_array)
-    }
-
-    # find genes that are DM with PCs but not Avgs
-    head(combined_df)
-
-    sub_df <- combined_df %>%
-        filter(formatted_rt == 'Full gene') %>%
-        select(feature, trait:adj_pval) %>%
-        separate(feature, c('gene_id', 'pc'), sep='-', fill='right') %>%
-        mutate(sig_dm = adj_pval < 0.05) %>%
-        group_by(gene_id, formatted_st, trait, formatted_ct, formatted_rt) %>%
-        summarise(min_pval = min(adj_pval)) %>%
-        mutate(sig_dm =  min_pval < 0.05) %>%
-        select(-min_pval) %>%
-        spread(formatted_st, sig_dm) %>%
-        filter(!Avgs, PCs)
-    head(sub_df)
-    dim(sub_df)
-
-    # how many pcs for each gene?
-    head(combined_df)
-    pc_counts <- combined_df %>%
-        filter(formatted_rt == 'Full gene') %>%
-        filter(summary_type == 'pcs') %>%
-        select(feature) %>%
-        separate(feature, c('gene_id', 'pc'), sep='-', fill='right') %>%
-        count(gene_id, name='num_pcs')
-    head(pc_counts)
-
-
-    # how many cpgs per gene?
-    datafile <- paste0(datadir, "full_gene_astro_gene_cpg_map.rds")
-    cpg_map <- readRDS(datafile)
-    head(cpg_map)
-
-    cpg_count <- cpg_map %>%
-        count(gene_id, name='num_cpgs')
-    head(cpg_count)
-
-    # add pc counts to selected genes
-    select_genes <- sub_df %>%
-        left_join(pc_counts) %>%
-        left_join(cpg_count)
-    head(select_genes)
-
-    select_genes %>%
-        filter(num_cpgs == 17
-        ) 
-
-    head(combined_df)
-    sorted_df <- combined_df %>%
-        filter(formatted_rt == 'Full gene',
-               summary_type == 'pcs') %>%
-        separate(feature, c('gene_id', 'pc'), sep='-', fill='right') %>%
-        filter(gene_id %in% select_genes$gene_id) %>%
-        arrange(-abs(logFC))
-    head(sorted_df)
-    
-
-    combined_df %>%
-        filter(grepl("ENSG00000076662.10", feature))
-
-    pcs_df <- combined_df %>%
-        filter(summary_type == 'pcs')
-    head(pcs_df)
-
-
-    # count number of sig PCs 
-    formatted_pcs <- pcs_df %>%
-        filter(adj_pval < 0.05) %>%
-        select(feature, summary_type, region_type, cell_type, trait) %>%
-        separate(feature, c('gene_id', 'pc'), sep='-')
-    head(formatted_pcs)
-
-    table(formatted_pcs$pc)
-
-    # how many PCs are sig per gene?
-    total_counts <- formatted_pcs %>%
-        count(region_type, cell_type, trait, gene_id, name='sig_pcs')
-    head(total_counts)
-
-    combined_dat <- formatted_pcs %>%
-        left_join(total_counts)
-    head(combined_dat)
-    unique(combined_dat$region_type)
-
-    head(combined_dat)
-    p <- combined_dat %>%
-        filter(region_type == 'Full genes',
-               trait == 'ceradsc') %>%
-        mutate(sig_pcs = factor(sig_pcs)) %>%
-        mutate(pc = factor(pc, levels=paste0("PC", 1:16))) %>%
-        select(-pc) %>%
-        unique() %>%
-        ggplot(aes(x=cell_type, fill=sig_pcs)) +
-        geom_bar(position='stack') +
-        facet_grid(trait ~ ., scales='free_y') +
-        #scale_color_manual(values=summary_type_colors, breaks=summary_types) +
-        #scale_fill_manual(values=summary_type_colors, breaks=summary_types) +
-        theme_bw() +
-        theme(
-              strip.background=element_rect(fill='white', color='black'),
-              panel.spacing=unit(0, 'lines'),
-              panel.border=element_rect(color='black', fill=NA, linewidth=0.5),
-              text=element_text(size=20, family='Open Sans'),
-              legend.title=element_text(size=20, face='bold'),
-              plot.title=element_text(hjust=0.5),
-              axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0)),
-              axis.text.x=element_text(angle=30, vjust=1, hjust=1)
-        ) +
-        #scale_y_continuous(trans='log10') +
-        ggtitle(paste(correction_type, "sig genes")) +
-        ylab("Count") +
-        xlab("Significant PCs per gene")
-    savefile <- paste0(sub_dir, "combined_pc_counts_bar.png")
-    savefile
-    ggsave(p, file=savefile, width=7, height=7)
-
-
-    # which pc is usually DM?
-    head(formatted_pcs)
-    pc_counts <- formatted_pcs %>%
-        count(pc, summary_type, region_type, cell_type, trait, name='pc_count')
-    head(pc_counts)
-
-
-    head(combined_dat)
-    ordered_pcs <- combined_dat %>%
-        arrange(-sig_pcs) 
-    (savefile <- paste0(sub_dir, "ceradsc_full_gene_dm_pcs_per_gene.csv"))
-    write_csv(ordered_pcs, savefile)
-
-    dim(combined_dat)
-    p <- combined_dat %>%
-        filter(region_type == 'Full gene',
-               trait == 'ceradsc') %>%
-        mutate(sig_pcs = factor(sig_pcs)) %>%
-        mutate(pc = factor(pc, levels=paste0("PC", 1:16))) %>%
-        ggplot(aes(x=cell_type, fill=pc)) +
-        geom_bar(position='stack') +
-        facet_wrap(. ~ sig_pcs, scales='free_y') +
-        #scale_color_manual(values=summary_type_colors, breaks=summary_types) +
-        #scale_fill_manual(values=summary_type_colors, breaks=summary_types) +
-        theme_bw() +
-        theme(
-              strip.background=element_rect(fill='white', color='black'),
-              panel.spacing=unit(0, 'lines'),
-              panel.border=element_rect(color='black', fill=NA, linewidth=0.5),
-              text=element_text(size=20, family='Open Sans'),
-              legend.title=element_text(size=20, face='bold'),
-              plot.title=element_text(hjust=0.5),
-              axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0)),
-              axis.text.x=element_text(angle=50, vjust=1, hjust=1)
-        ) +
-        #scale_y_continuous(trans='log10') +
-        ggtitle(paste(correction_type, "sig genes")) +
-        ylab("Count") +
-        xlab("Cell type")
-    savefile <- paste0(sub_dir, "combined_pc_counts_bar2.png")
-    savefile
-    ggsave(p, file=savefile, width=9, height=7)
-
-    # how many sig pcs per gene?
-    counts <- formatted_pcs %>%
-        count(region_type, cell_type, trait, gene_id, name='sig_pcs') %>%
-        arrange(-sig_pcs) 
-    head(counts)
-
-    table(counts$sig_pcs)
-    summary(counts$sig_pcs)
-
-
-    combined_counts <- total_counts %>%
-        select(-gene_id) %>%
-        left_join(pc_counts) %>%
-        unique()
-    head(combined_counts)
-
-    head(combined_dat)
-    #p <- combined_counts %>%
-    p <- combined_dat %>%
-        filter(region_type == 'Full genes',
-               trait == 'ceradsc') %>%
-        #mutate(sig_pcs = as.factor(n)) %>%
-        ggplot(aes(x=cell_type, fill=pc)) +
-        #geom_bar(stat='identity', position='dodge') +
-        #geom_text(aes(label=nn,
-                      #y=nn,
-                      ##color=color
-                      #),
-                  #hjust=0.5,
-                  #vjust=-0.5,
-                  #show.legend=FALSE,
-                  #size=5,
-                  ##position=position_dodge(width = .9)
-                  #) +
-        facet_grid(trait ~ ., scales='fixed') +
-        #scale_color_manual(values=summary_type_colors, breaks=summary_types) +
-        #scale_fill_manual(values=summary_type_colors, breaks=summary_types) +
-        theme_bw() +
-        theme(
-              strip.background=element_rect(fill='white', color='black'),
-              panel.spacing=unit(0, 'lines'),
-              panel.border=element_rect(color='black', fill=NA, linewidth=0.5),
-              text=element_text(size=20, family='Open Sans'),
-              legend.title=element_text(size=20, face='bold'),
-              plot.title=element_text(hjust=0.5),
-              axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0)),
-        ) +
-        #coord_cartesian(ylim=c(0,270)) +
-        ggtitle(paste(correction_type, "sig genes")) +
-        ylab("Count") +
-        xlab("Significant PCs per gene")
-    savefile <- paste0(sub_dir, "pcs_sig_per_gene_bar.png")
-    savefile
-    ggsave(p, file=savefile, width=12, height=7)
-
-    # plto pc counts
-    head(pc_counts)
-    p <- pc_counts %>%
-        filter(region_type == 'Full genes',
-               trait == 'ceradsc'
-        ) %>%
-        mutate(pc = str_remove(pc, "PC")) %>%
-        mutate(pc = factor(pc, levels=1:16)) %>%
-        ggplot(aes(x=cell_type, y=pc_count, fill=pc),
-               show.legend=FALSE) +
-        geom_bar(stat='identity', position='stack') +
-        #geom_text(aes(label=pc_count,
-                      #y=pc_count,
-                      ##color=color
-                      #),
-                  #hjust=0.5,
-                  #vjust=-0.5,
-                  #show.legend=FALSE,
-                  #size=5,
-                  ##position=position_dodge(width = .9)
-                  #) +
-        facet_grid(trait ~ ., scales='fixed') +
-        #scale_color_manual(values=summary_type_colors, breaks=summary_types) +
-        #scale_fill_manual(values=summary_type_colors, breaks=summary_types) +
-        theme_bw() +
-        theme(
-              strip.background=element_rect(fill='white', color='black'),
-              panel.spacing=unit(0, 'lines'),
-              panel.border=element_rect(color='black', fill=NA, linewidth=0.5),
-              text=element_text(size=20, family='Open Sans'),
-              legend.title=element_text(size=20, face='bold'),
-              plot.title=element_text(hjust=0.5),
-              axis.title.y=element_text(margin=margin(t=0, r=30, b=0, l=0)),
-              axis.text.x=element_text(angle=30, vjust=1, hjust=1)
-        ) +
-        #coord_cartesian(ylim=c(0,270)) +
-        ggtitle(paste(correction_type, "sig genes")) +
-        ylab("Count") +
-        xlab("Cell type")
-    savefile <- paste0(sub_dir, "pcs_count.png")
-    savefile
-    ggsave(p, file=savefile, width=7, height=7)
-
-}
-
-plot_manhattan <- function(combined_df, correction_type, summary_type_colors, plotting_dir, full_array=FALSE){
-    head(combined_df)
-
-    tr <- "ceradsc"
-    st <- "PCs"
-    rt <- "Full genes"
-    ct <- "Astrocytes"
-
-    create_manhattan_plot <- function(row){
-        tr <- row[['trait']] %>% as.character()
-        st <- row[['summary_type']] %>% as.character()
-        rt <- row[['region_type']] %>% as.character() 
-        ct <- row[['cell_type']] %>% as.character()
-
-        filtered_df <- combined_df %>%
-            filter(trait == tr,
-                   summary_type == st,
-                   region_type == rt,
-                   cell_type == ct
-            )
-
-        # figure out x-axis positions
-        # use TSS ofr the genes
-        datafile <- paste0("/home/eulalio/deconvolution/data/region_annotations/hg38_genes_promoters_annotations.R")
-        gene_annots <- read_tsv(datafile)
-        head(gene_annots)
-
-        # get fields to annotate genes
-        formatted_annots <- gene_annots %>%
-            select(chrom=seqnames, pos=end, gene_id=gencode_gene_id, symbol=gencode_gene_name)
-        head(formatted_annots)
-
-        head(filtered_df)
-        dm_data <- filtered_df %>%
-            select(feature, pval=bh_pval) %>%
-            separate(feature, c("gene_id", "pc"), sep='-', fill='right') %>%
-            left_join(formatted_annots) %>%
-            mutate(chrom = as.numeric(str_remove(chrom, "chr"))) 
-        head(dm_data)
-
-        data_cum <- dm_data %>%
-            group_by(chrom) %>%
-            summarise(max_bp = max(pos)) %>%
-            mutate(bp_add = lag(cumsum(max_bp), default=0)) %>%
-            select(chrom, bp_add)
-        head(data_cum)
-
-
-        load_ad_genes <- function(){
-            # load the opentargets genes
-            datafile <- paste0("/home/eulalio/deconvolution/rosmap/data/gene_sets/AD_opentargets.csv")
-            opentargets <- read_csv(datafile)
-            head(opentargets)
-
-
-            # map the gene_ids in our dmp results to symbols
-            datafile <- paste0("/home/eulalio/deconvolution/data/gene_biomart_table.csv")
-            gene_annots <- read_csv(datafile) %>%
-                rename(gene_no_vers=gene_id,
-                       gene_id=ensembl_gene_id_version) 
-            head(gene_annots)
-
-            head(opentargets)
-            head(gene_annots)
-
-
-            # add gene annotations to the opentargets genes
-            opentargets_annots <- opentargets %>%
-                left_join(gene_annots) %>%
-                select(symbol, overallAssociationScore, gene_id)
-            head(opentargets_annots)
-
-            opentargets_annots
-        }
-        opentargets_annots <- load_ad_genes()
-        head(opentargets_annots)
-
-        (thresh <- quantile(opentargets_annots$overallAssociationScore, 0.8))
-        opentargets_top <- opentargets_annots %>%
-            filter(overallAssociationScore > thresh)
-
-        head(dm_data)
-        dm_annots <- dm_data %>%
-            inner_join(data_cum, by="chrom") %>%
-            mutate(bp_cum = pos + bp_add) %>%
-            # add a highlight label
-            mutate(is_highlight = ifelse(pval < 0.05, "yes", "no")) %>%
-            mutate(is_annotate = ifelse((pval < 0.05) & (gene_id %in% opentargets_top$gene_id), "yes", "no")) %>%
-            # add highly significant ones too
-            mutate(is_annotate = ifelse(-log10(pval) > 3, "yes", is_annotate))
-        head(dm_annots)
-
-        dm_annots %>%
-            filter(symbol == "PSENEN")
-
-        table(dm_annots$is_highlight)
-        table(dm_annots$is_annotate)
-
-        # get the center of chromosome to position x axis labels
-        axis_set <- dm_annots %>%
-            group_by(chrom) %>%
-            summarize(center = mean(bp_cum))
-        head(axis_set)
-
-        head(dm_annots)
-        ylim <- -log10(min(dm_annots$pval, na.rm=TRUE)) + 2
-        ylim
-
-        sig <- 0.05
-
-        manhplot <- ggplot(dm_annots,
-                            aes(x=bp_cum, y=-log10(pval),
-                                color=as_factor(chrom), size=-log10(pval))) +
-            geom_hline(yintercept = -log10(sig), color="grey40", linetype="dashed") +
-            geom_point(alpha = 0.75) +
-            scale_x_continuous(label = axis_set$chrom, breaks=axis_set$center) +
-            scale_y_continuous(expand = c(0,0), 
-                               limits=c(0,ylim)
-                               ) +
-            scale_size_continuous(range = c(0.5,3)) +
-
-            scale_color_manual(values = rep(c("darkred", "dodgerblue3"), unique(length(axis_set$chrom)))) +
-            # add highlighted points
-            geom_point(data=subset(dm_annots, is_annotate=="yes"), color="orange", size=3) +
-            # add label 
-            geom_label_repel(data=subset(dm_annots, is_annotate=="yes"), aes(label=symbol), size=2) +
-            labs(x=NULL, y="-log10(FDR pval)") +
-            #theme_minimal() +
-            theme_bw() +
-            theme(
-                  legend.position = "none",
-                    panel.grid.major.x = element_blank(),
-                    panel.grid.minor.x = element_blank(),
-                    #axis.title.y = element_markdown(),
-                    axis.text.x = element_text(angle = 60, size = 8, vjust = 0.5),
-                    panel.border = element_blank()
-            ) +
-            ggtitle(paste(tr, st, ct, rt, "DM AD genes"))
-
-        manhattandir <- paste0(savedir, "manhattan_plot/")
-        filename <- paste(tr, st, ct, rt, "manhattan_plot.png", sep='_')
-        savefile <- paste0(manhattandir, filename)
-        savefile
-
-        ggsave(savefile, height=6, width=8)
-        1
-    }
-
-    head(combined_df)
-    region_types <- unique(combined_df$region_type)
-    cell_types <- unique(combined_df$cell_type)
-    summary_types <- unique(combined_df$summary_type)
-    traits <- unique(combined_df$trait)
-
-    runs <- expand.grid(region_type=region_types,
-                        cell_type=cell_types,
-                        summary_type=summary_types,
-                        trait=traits
-    )
-
-    apply(runs, 1, create_manhattan_plot)
-
-}
-
-
-
-
 
 # Main function for differential methylation analysis
 main <- function(){
