@@ -21,7 +21,9 @@ This pipeline contains a set of functions designed to perform statistical fine-m
     - [04_run_qtl_dapg.sh](#script-12)
     - [05_make_fastqtl_qtl_annotations.sh](#script-13)
     - [06_format_fastqtl_qtl_input.py](#script-14)
-
+- [04_fastenloc](#dir-04)
+    - [01_run_fastenloc.sh](#script-15)
+    
 ## <a name="dir-01">`01_check_data/`</a>
 
 ## Script 01                                    
@@ -723,3 +725,51 @@ python3 script_name.py <summary_type_index> <cell_type_index> <region_type_index
 Ensure that the appropriate index values are used for summary, cell, and region types. The script generates a formatted VCF file and compresses it for FastQTL use.
 
 ---
+
+## <a name="dir-04">`04_fastenloc/`</a>
+
+## Script 15                                   
+## 01_run_fastenloc.sh
+
+This script runs FastENLOC to perform colocalization analysis on QTL and GWAS data. It requires input VCF files with fine-mapped QTL annotations and GWAS data, and outputs the colocalization results.
+
+## Command Line Arguments
+
+- `SUMMARYTYPE`: The summary type (e.g., averages, principal components, or CpGs).
+- `CELLTYPE`: The cell type (e.g., bulk, astro, neuron, etc.).
+- `REGIONTYPE`: The genomic region type (e.g., full gene, gene body, promoters, preTSS).
+- `GWASTYPE`: The type of GWAS data being used (e.g., Wightman, Kunkle).
+- `NUM_GWAS_VARS`: The total number of GWAS variants tested.
+
+## Output Directory Structure
+
+The script creates the following directory structure to store FastENLOC outputs:
+
+1. **Main Output Directory**:
+   - A base directory for storing FastENLOC results.
+   - The structure is organized by summary, cell, region types, and GWASTYPE.
+
+2. **Subdirectories**:
+   - Specific subdirectories for different summary, cell, and region types, and GWASTYPE.
+
+## Execution Steps
+
+1. **Create Output Directory**:
+   - Create the main output directory for storing FastENLOC results.
+   - Create specific subdirectories based on the summary, cell, and region types, and GWASTYPE.
+
+2. **Run FastENLOC**:
+   - Use the `-total_variants` flag to specify the total number of GWAS variants tested.
+   - Set the number of threads with the `-thread` flag (here, it uses 1 thread).
+   - Define the output prefix for FastENLOC results.
+   - Specify the input QTL file and GWAS file for colocalization analysis.
+
+## Running the Script
+
+To execute the script, use the following command with the required arguments:
+
+```bash
+bash script_name.sh <SUMMARYTYPE> <CELLTYPE> <REGIONTYPE> <GWASTYPE> <NUM_GWAS_VARS>
+```
+
+Ensure the appropriate values are provided for summary, cell, region types, and GWASTYPE, along with the total number of GWAS variants tested. The script performs colocalization analysis using FastENLOC and saves the results in the specified output directory.
