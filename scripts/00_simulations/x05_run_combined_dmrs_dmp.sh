@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
 
-#SBATCH --job-name=sim
-#SBATCH --output=../../output/00_sbatch_output/array_%a.out
-#SBATCH --error=../../output/00_sbatch_output/array_%a.err
-#SBATCH --array=1-80
+#SBATCH --job-name=sim_dmr
+#SBATCH --output=../../output/05_combined_dmrs_dmp/sbatch_output/array_%a.out
+#SBATCH --error=../../output/05_combined_dmrs_dmp/sbatch_output/array_%a.err
+#SBATCH --array=1-100
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --mem=128G
 #SBATCH --cpus-per-task=1
 #SBATCH --partition=nih_s10
 #SBATCH --account=smontgom
-#SBATCH --time=4-00:00:00
+#SBATCH --time=0-3:00:00
+#SBATCH --wait
 
 # make sure conda environment is activated
 . "${HOME}/micromamba/etc/profile.d/conda.sh"
 . "${HOME}/micromamba/etc/profile.d/mamba.sh"
 mamba activate base
-mamba activate R4.2
+#mamba activate R4.2
+mamba activate r
 
 conda info --envs
 
 echo "Processing job " $SLURM_ARRAY_TASK_ID 
 
-Rscript ./00_simulation_test.R $SLURM_ARRAY_TASK_ID
+Rscript ./05_combined_dmrs_dmp.R $SLURM_ARRAY_TASK_ID

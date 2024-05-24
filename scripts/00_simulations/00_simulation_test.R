@@ -12,7 +12,7 @@ library(tidyverse)
 ## First source both the "RRBSsimulation.R" and "RRBSmodeling.R" scripts and make sure that all required libraries are installed
 ## Install the appropriate packages, some are out of date, you may get
 ## warning messages about invalid components but the code will still run
-setwd("D:/montgomery_lab/deconvolution_project/rosmap_methylation_regional_pcs/scripts/00_simulations/")
+#setwd("D:/montgomery_lab/deconvolution_project/rosmap_methylation_regional_pcs/scripts/00_simulations/")
 source("RRBSsimulation.R")
 source("RRBSmodeling.R")
 
@@ -325,9 +325,9 @@ main <- function(runnum, N){
         
         # load the output if we ran these parameters before
         # otherwise, simulate the data
-        if (file.exists(savefile)){
-            simulated_dat <- readRDS(savefile)
-        } else{
+        #if (file.exists(savefile)){
+            #simulated_dat <- readRDS(savefile)
+        #} else{
             # simulate the region's meth for N regions
             simulated_dat <- get_N_regions(num_sites, num_samples,
                                            percent_meth_difference,
@@ -343,22 +343,25 @@ main <- function(runnum, N){
                                 "_N", N))
             (savefile <- paste0(savedir, filename, ".rds"))
             saveRDS(simulated_dat, savefile)
-        }
+        #}
     }
         
         
     # parameter ranges that are being tested
-    #num_sites_range <- c(20,50)
+    num_sites_range <- c(20, 50)
     #num_samples_range <- c(50,500,5000)
-    #percent_sites_dm_range <- seq(0,0.75,0.25)
-    #percent_meth_difference_range <- seq(0.1, 0.9, 0.1)
+    num_samples_range <- c(5000)
+    percent_sites_dm_range <- seq(0.25,1,0.25)
+    percent_meth_difference_range <- seq(0.00001, 0.1, 0.01)
+    #percent_meth_difference_range <- seq(0.00001, 0.006, 0.0006)
+    #percent_meth_difference_range <- seq(0.01, 0.09, 0.01)
+    percent_meth_difference_range
 
     # paramters to test on second run
-    num_sites_range <- c(20,50)
-    num_samples_range <- c(50,500)
-    percent_sites_dm_range <- seq(0,0.75,0.25)
-    percent_meth_difference_range <- seq(0.01, 0.2, 0.01)
-    dmr_length_range = c(250, 2000)
+    #num_sites_range <- c(20,50)
+    #num_samples_range <- c(50,500)
+    #percent_sites_dm_range <- seq(0.01, 0.2, 0.01)
+    #percent_meth_difference_range <- seq(0,1,0.25)
 
     runs <- expand.grid(num_sites=num_sites_range,
                         num_samples=num_samples_range,
@@ -376,7 +379,7 @@ main <- function(runnum, N){
         percent_meth_difference <- run[['percent_meth_difference']] %>% as.numeric()
         percent_sites_dm <- run[['percent_sites_dm']] %>% as.numeric()
 
-        #dmr_length <- num_sites / 10
+        dmr_length <- num_sites / 2
 
         print(paste("Processing run", run[['run']], "out of", nrow(runs)))
         print(paste("Parameters:", "numsite:", num_sites, 
@@ -393,6 +396,8 @@ main <- function(runnum, N){
 
     #res <- apply(runs, 1, process_run)
     process_run(runs[runnum,])
+
+
     return(1)
 }
 
